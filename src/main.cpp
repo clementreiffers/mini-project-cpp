@@ -88,6 +88,46 @@ vector<Mat> randomizeVectorMat(vector<Mat> vec) {
   return vec;
 }
 
+void postProcessing(vector<Mat> outs, Net net, Mat img) {
+  float confidenceThreshold = 0.33;
+
+  vector<int> classIds;
+  vector<float> confidences;
+  vector<Rect> boxes;
+
+  for (int i = 0; i < outs.size(); i++) {
+    Mat outBlob = Mat(outs[i].size(), outs[i].depth(), outs[i].data);
+
+    for (int j = 0; j < outBlob.rows; j++) {
+      Mat scores = outBlob.row(j).colRange(5, outBlob.cols);
+      Point classIdPoint;
+      double confidence;
+      minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
+      if (confidence > confidenceThreshold) {
+        int centerX = outBlob.row(j).at<float>(0) * img.cols;
+        int centerY = outBlob.row(j).at<float>(1) * img.rows;
+        int width   = outBlob.row(j).at<float>(2) * img.cols;
+        int height  = outBlob.row(j).at<float>(3) * img.rows;
+        int left    = centerX - width / 2;
+        int top     = centerY - height / 2;
+
+        classIds.push_back(classIdPoint.x);
+        confidences.push_back(confidence);
+        boxes.push_back(Rect(left, top, width, height));
+      }
+    }
+  }
+
+  float nmsThreshold = 0.5;
+  vector<int> indices;
+  NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
+  for (int i = 0; i < indices.size(); i++) {
+    int idx  = indices[i];
+    Rect box = boxes[idx];
+    rectangle(img, box, Scalar(0, 255, 0), 2);
+  }
+}
+
 int main() {
   vector<Mat> imageMat =
       randomizeVectorMat(readImageVector(getAllImageFiles(IMAGE_PATH_DIR)));
@@ -104,31 +144,40 @@ int main() {
     classes.push_back(line);
   }
 
-  Net model = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
+  Net model         = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
+
+  string file_yolo  = "models/yolo/classes_names_yolo.txt";
+  string cfg_file   = "models/yolo/yolov4-tiny.cfg";
+  string model_file = "models/yolo/yolov4-tiny.weights";
+
+  Net net           = readNet(model_file, cfg_file);
 
   for (const auto &img : imageMat) {
-    blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
-    model.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
+
     blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
     model.setInput(blob);
+    net.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
     Mat prob = model.forward();
 
     Point classIdPoint;
     double confidence;
     minMaxLoc(prob, nullptr, &confidence, nullptr, &classIdPoint);
-    int classId             = classIdPoint.x;
+    int classId                 = classIdPoint.x;
 
-    vector<string> outNames = model.getUnconnectedOutLayersNames();
+    vector<string> outNames     = model.getUnconnectedOutLayersNames();
+    vector<string> outNamesYolo = net.getUnconnectedOutLayersNames();
     vector<Mat> outs;
     model.forward(outs, outNames);
+    net.forward(outs, outNamesYolo);
 
     string label = format("%s: %2.f", classes[classId].c_str(), confidence);
 
     putText(img, label, Point(0, img.rows - 7), FONT_HERSHEY_SIMPLEX, 0.8,
             CV_RGB(0, 255, 0), 2, LINE_AA);
 
-    imshow("image", img);
+    postProcessing(outs, net, img);
 
-    waitKey(1000);
+    imshow("image", img);
+    waitKey(0);
   }
 }
