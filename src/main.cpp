@@ -8,6 +8,7 @@
 #include "opencv2/videoio.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -27,6 +28,7 @@
 using namespace cv;
 using namespace std;
 using namespace dnn;
+using namespace std::chrono;
 
 Mat readImage(const string &path) {
   // here we give the matrix of the image given by its path
@@ -89,6 +91,7 @@ vector<Mat> randomizeVectorMat(vector<Mat> vec) {
 }
 
 int main() {
+
   vector<Mat> imageMat =
       randomizeVectorMat(readImageVector(getAllImageFiles(IMAGE_PATH_DIR)));
   Mat blob;
@@ -107,6 +110,8 @@ int main() {
   Net model = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
 
   for (const auto &img : imageMat) {
+    auto start = high_resolution_clock::now();
+
     blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
     model.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
     blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
@@ -129,6 +134,10 @@ int main() {
 
     imshow("image", img);
 
+    auto stop              = high_resolution_clock::now();
+    auto duration          = duration_cast<microseconds>(stop - start);
+    float countMiliseconds = duration.count() / 1000;
+    cout << "execution time in miliseconds : " << countMiliseconds << endl;
     waitKey(1000);
   }
 }
