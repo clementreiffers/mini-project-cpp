@@ -7,10 +7,13 @@
 #include "opencv2/opencv.hpp"
 #include "opencv2/videoio.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <string>
+#include <vector>
 
 #define DATA_PATH "data/"
 #define IMAGE_PATH_DIR DATA_PATH "small-Voc2007/"
@@ -79,8 +82,15 @@ vector<string> getAllImageFiles(const string &path) {
   return imagePath;
 }
 
+vector<Mat> randomizeVectorMat(vector<Mat> vec) {
+  mt19937 engine(random_device{}());
+  std::shuffle(vec.begin(), vec.end(), engine);
+  return vec;
+}
+
 int main() {
-  vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
+  vector<Mat> imageMat =
+      randomizeVectorMat(readImageVector(getAllImageFiles(IMAGE_PATH_DIR)));
   Mat blob;
 
   ifstream ifs(GOOGLE_CLASS_NAMES);
@@ -115,7 +125,7 @@ int main() {
     string label = format("%s: %2.f", classes[classId].c_str(), confidence);
 
     putText(img, label, Point(0, img.rows - 7), FONT_HERSHEY_SIMPLEX, 0.8,
-            CV_RGB(255, 255, 255), 2, LINE_AA);
+            CV_RGB(0, 255, 0), 2, LINE_AA);
 
     imshow("image", img);
 
