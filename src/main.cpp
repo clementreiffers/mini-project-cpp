@@ -78,10 +78,11 @@ vector<string> getAllImageFiles(const string &path) {
 
 int main() {
   vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
-  Net model            = readNet(MODEL_FILE, CFG_FILE);
-  VideoCapture cap     = readVideo(VIDEO_PATH);
-  while (true) {
-    Mat frame, blob;
-    cap >> frame;
+  Mat blob;
+
+  for (const auto &image : imageMat) {
+    imshow("image", image);
+    blobFromImage(image, blob, 1., Size(416, 416), Scalar(), true);
+    waitKey(1000);
   }
 }
