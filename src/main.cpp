@@ -4,6 +4,7 @@
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
+#include "opencv2/opencv.hpp"
 #include "opencv2/videoio.hpp"
 
 #include <filesystem>
@@ -15,6 +16,7 @@
 
 using namespace cv;
 using namespace std;
+using namespace dnn;
 
 Mat readImage(const string &path) {
   // here we give the matrix of the image given by its path
@@ -74,11 +76,9 @@ int main() {
   vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
   Mat blob;
 
-  for (int i = 0; i < imageMat.size(); i++) {
-    imshow("image", imageMat[i]);
-    blobFromImage(imageMat[i], blob, 1., Size(416, 416), Scalar(), true);
-    waitKey(0);
-    destroyAllWindows();
-    cout << "ferdffvvv" << endl;
+  for (const auto &img : imageMat) {
+    imshow("image", img);
+    blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
+    waitKey(1000);
   }
 }
