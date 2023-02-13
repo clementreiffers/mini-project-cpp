@@ -72,4 +72,12 @@ vector<string> getAllImageFiles(const string &path) {
 
 int main() {
   vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
+  Mat blob;
+
+  for (int i = 0; i < imageMat.size(); i++) {
+    imshow("image", imageMat[i]);
+    blobFromImage(imageMat[i], blob, 1., Size(416, 416), Scalar(), true);
+    waitKey(0);
+    destroyAllWindows();
+  }
 }
