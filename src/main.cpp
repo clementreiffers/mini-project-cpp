@@ -8,11 +8,18 @@
 #include "opencv2/videoio.hpp"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 
 #define DATA_PATH "data/"
 #define IMAGE_PATH_DIR DATA_PATH "small-Voc2007/"
+
+#define MODEL_PATH "models/"
+
+#define GOOGLE_CFG_FILE MODEL_PATH "google/bvlc_googlenet.caffemodel"
+#define GOOGLE_MODEL_FILE MODEL_PATH "google/bvlc_googlenet.prototxt"
+#define GOOGLE_CLASS_NAMES MODEL_PATH "google/classes_names_googlenet.txt"
 
 using namespace cv;
 using namespace std;
@@ -76,9 +83,42 @@ int main() {
   vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
   Mat blob;
 
+  ifstream ifs(GOOGLE_CLASS_NAMES);
+  if (!ifs.is_open()) {
+    cerr << GOOGLE_CLASS_NAMES << " not found!" << endl;
+  }
+
+  vector<string> classes;
+  string line;
+  while (getline(ifs, line)) {
+    classes.push_back(line);
+  }
+
+  Net model = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
+
   for (const auto &img : imageMat) {
-    imshow("image", img);
     blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
+    model.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
+    blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
+    model.setInput(blob);
+    Mat prob = model.forward();
+
+    Point classIdPoint;
+    double confidence;
+    minMaxLoc(prob, nullptr, &confidence, nullptr, &classIdPoint);
+    int classId             = classIdPoint.x;
+
+    vector<string> outNames = model.getUnconnectedOutLayersNames();
+    vector<Mat> outs;
+    model.forward(outs, outNames);
+
+    string label = format("%s: %2.f", classes[classId].c_str(), confidence);
+
+    putText(img, label, Point(0, img.rows - 7), FONT_HERSHEY_SIMPLEX, 0.8,
+            CV_RGB(255, 255, 255), 2, LINE_AA);
+
+    imshow("image", img);
+
     waitKey(1000);
   }
 }
