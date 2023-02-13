@@ -5,6 +5,7 @@
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/videoio.hpp"
+#include <opencv2/opencv.hpp>
 
 #include <filesystem>
 #include <iostream>
@@ -12,9 +13,14 @@
 
 #define DATA_PATH "data/"
 #define IMAGE_PATH_DIR DATA_PATH "small-Voc2007/"
+#define VIDEO_PATH DATA_PATH "video_test.mp4"
+#define GOOGLE_MODEL_PATH "models/google/"
+#define MODEL_FILE GOOGLE_MODEL_PATH "bvlc_googlenet.caffemodel"
+#define CFG_FILE GOOGLE_MODEL_PATH "bvlc_googlenet.prototxt"
 
 using namespace cv;
 using namespace std;
+using namespace dnn;
 
 Mat readImage(const string &path) {
   // here we give the matrix of the image given by its path
@@ -72,4 +78,10 @@ vector<string> getAllImageFiles(const string &path) {
 
 int main() {
   vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
+  Net model            = readNet(MODEL_FILE, CFG_FILE);
+  VideoCapture cap     = readVideo(VIDEO_PATH);
+  while (true) {
+    Mat frame, blob;
+    cap >> frame;
+  }
 }
