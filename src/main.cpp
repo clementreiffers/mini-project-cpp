@@ -90,6 +90,12 @@ vector<Mat> randomizeVectorMat(vector<Mat> vec) {
   return vec;
 }
 
+time_point<steady_clock> getNow() { return high_resolution_clock::now(); }
+
+long long computeDuration(time_point<steady_clock> &start) {
+  return duration_cast<microseconds>(getNow() - start).count() / 1000;
+}
+
 int main() {
 
   vector<Mat> imageMat =
@@ -112,20 +118,16 @@ int main() {
   for (const auto &img : imageMat) {
     auto start = high_resolution_clock::now();
 
-    blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
-    model.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
     blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
     model.setInput(blob);
-    Mat prob = model.forward();
 
     Point classIdPoint;
     double confidence;
-    minMaxLoc(prob, nullptr, &confidence, nullptr, &classIdPoint);
-    int classId             = classIdPoint.x;
+    minMaxLoc(model.forward(), nullptr, &confidence, nullptr, &classIdPoint);
+    int classId = classIdPoint.x;
 
-    vector<string> outNames = model.getUnconnectedOutLayersNames();
     vector<Mat> outs;
-    model.forward(outs, outNames);
+    model.forward(outs, model.getUnconnectedOutLayersNames());
 
     string label = format("%s: %2.f", classes[classId].c_str(), confidence);
 
@@ -134,9 +136,8 @@ int main() {
 
     imshow("image", img);
 
-    auto stop              = high_resolution_clock::now();
-    auto duration          = duration_cast<microseconds>(stop - start);
-    float countMiliseconds = duration.count() / 1000;
+    long long countMiliseconds = computeDuration(start);
+
     cout << "execution time in miliseconds : " << countMiliseconds << endl;
     waitKey(1000);
   }
