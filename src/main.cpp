@@ -79,5 +79,6 @@ int main() {
     blobFromImage(imageMat[i], blob, 1., Size(416, 416), Scalar(), true);
     waitKey(0);
     destroyAllWindows();
+    cout << "ferdv" << endl;
   }
 }
