@@ -8,6 +8,7 @@
 #include "opencv2/videoio.hpp"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -72,13 +73,77 @@ vector<string> getAllImageFiles(const string &path) {
   return imagePath;
 }
 
+void postProcessing(vector<Mat> outs, Net net, Mat img) {
+  float confidenceThreshold = 0.33;
+
+  vector<int> classIds;
+  vector<float> confidences;
+  vector<Rect> boxes;
+
+  for (int i = 0; i < outs.size(); i++) {
+    Mat outBlob = Mat(outs[i].size(), outs[i].depth(), outs[i].data);
+
+    for (int j = 0; j < outBlob.rows; j++) {
+      Mat scores = outBlob.row(j).colRange(5, outBlob.cols);
+      Point classIdPoint;
+      double confidence;
+      minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
+      if (confidence > confidenceThreshold) {
+        int centerX = outBlob.row(j).at<float>(0) * img.cols;
+        int centerY = outBlob.row(j).at<float>(1) * img.rows;
+        int width   = outBlob.row(j).at<float>(2) * img.cols;
+        int height  = outBlob.row(j).at<float>(3) * img.rows;
+        int left    = centerX - width / 2;
+        int top     = centerY - height / 2;
+
+        classIds.push_back(classIdPoint.x);
+        confidences.push_back(confidence);
+        boxes.push_back(Rect(left, top, width, height));
+      }
+    }
+  }
+
+  float nmsThreshold = 0.5;
+  vector<int> indices;
+  NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
+  for (int i = 0; i < indices.size(); i++) {
+    int idx  = indices[i];
+    Rect box = boxes[idx];
+    rectangle(img, box, Scalar(0, 255, 0), 2);
+    // draw prediction
+  }
+}
+
 int main() {
   vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
   Mat blob;
 
+  string file = "yolo/classes_names_yolo.txt";
+  ifstream ifs(file.c_str());
+  if (!ifs.is_open())
+    cerr << file << " not found !" << endl;
+
+  string cfg_file   = "yolo/yolov4-tiny.cfg";
+  string model_file = "yolo/yolov4-tiny.weights";
+
+  vector<string> classes;
+  string line;
+  while (getline(ifs, line))
+    classes.push_back(line);
+
+  Net net = readNet(model_file, cfg_file);
+
   for (const auto &img : imageMat) {
-    imshow("image", img);
+
     blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
+    net.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
+
+    vector<String> outNames = net.getUnconnectedOutLayersNames();
+    vector<Mat> outs;
+
+    net.forward(outs, outNames);
+    postProcessing(outs, net, img);
+    imshow("image", img);
     waitKey(1000);
   }
 }
