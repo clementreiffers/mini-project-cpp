@@ -143,8 +143,8 @@ int main() {
       classes.push_back(line);
     }
 
-    Net model = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
-    Net net   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
+    Net modelGoogle = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
+    Net modelYolo   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
     for (const auto &img : imageMat) {
       int padding = 50;
@@ -157,24 +157,24 @@ int main() {
 
       blobFromImage(padded_image, blob, 1., Size(224, 224),
                     Scalar(104, 117, 123), true);
-      model.setInput(blob);
-      net.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
-      Mat prob = model.forward();
+      modelGoogle.setInput(blob);
+      modelYolo.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
+      Mat probGoogle = modelGoogle.forward();
 
       Point classIdPoint;
       double confidence;
-      minMaxLoc(prob, nullptr, &confidence, nullptr, &classIdPoint);
+      minMaxLoc(probGoogle, nullptr, &confidence, nullptr, &classIdPoint);
       int classId                 = classIdPoint.x;
 
-      vector<string> outNames     = model.getUnconnectedOutLayersNames();
-      vector<string> outNamesYolo = net.getUnconnectedOutLayersNames();
-      vector<Mat> outs;
-      model.forward(outs, outNames);
-      net.forward(outs, outNamesYolo);
+      vector<string> outNames     = modelGoogle.getUnconnectedOutLayersNames();
+      vector<string> outNamesYolo = modelYolo.getUnconnectedOutLayersNames();
+      vector<Mat> outsGoogle, outsYolo;
+      modelGoogle.forward(outsGoogle, outNames);
+      modelYolo.forward(outsYolo, outNamesYolo);
 
       string label = format("%s: %2.f", classes[classId].c_str(), confidence);
 
-      postProcessing(outs, model, padded_image);
+      postProcessing(outsYolo, modelYolo, padded_image);
 
       putText(padded_image, label, Point(0, padded_image.rows - 7),
               FONT_HERSHEY_SIMPLEX, 0.8, CV_RGB(0, 255, 0), 2, LINE_AA);
@@ -183,3 +183,4 @@ int main() {
       waitKey(1000);
     }
   }
+}
