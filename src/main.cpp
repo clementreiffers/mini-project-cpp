@@ -20,6 +20,7 @@
 
 #define DATA_PATH "data/"
 #define IMAGE_PATH_DIR DATA_PATH "small-Voc2007/"
+#define VIDEO_PATH DATA_PATH "Video2.mp4"
 
 #define MODEL_PATH "models/"
 
@@ -230,7 +231,6 @@ int askChoice() {
 }
 
 int main() {
-
   vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
   Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
@@ -251,5 +251,20 @@ int main() {
     cin >> path;
     computeReadAndPredictRandomImages(path, yoloModel, googleModel,
                                       googleClassNames);
-  }
+  case 4:
+    VideoCapture capture            = readVideo(VIDEO_PATH);
+
+    Mat frame;
+    while (true) {
+      capture >> frame;
+
+      resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
+
+      drawRoi(frame, yoloModel, GREEN);
+      drawPredictions(frame, googleModel, googleClassNames, GREEN);
+
+      imshow("video", frame);
+      if (waitKey(1) == 27)
+        break;
+       }
 }
