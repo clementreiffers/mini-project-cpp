@@ -24,6 +24,10 @@
 #define GOOGLE_MODEL_FILE MODEL_PATH "google/bvlc_googlenet.prototxt"
 #define GOOGLE_CLASS_NAMES MODEL_PATH "google/classes_names_googlenet.txt"
 
+#define YOLO_MODEL_FILE MODEL_PATH "yolo/yolov4-tiny.weights"
+#define YOLO_CFG_FILE MODEL_PATH "yolo/yolov4-tiny.cfg"
+#define YOLO_CLASS_NAMES MODEL_PATH "yolo/classes_names_yolo.txt"
+
 using namespace cv;
 using namespace std;
 using namespace dnn;
@@ -95,37 +99,36 @@ void postProcessing(vector<Mat> outs, Net net, Mat img) {
   vector<float> confidences;
   vector<Rect> boxes;
 
-  for (int i = 0; i < outs.size(); i++) {
-    Mat outBlob = Mat(outs[i].size(), outs[i].depth(), outs[i].data);
+  for (auto &out : outs) {
+    Mat outBlob = Mat(out.size(), out.depth(), out.data);
 
     for (int j = 0; j < outBlob.rows; j++) {
       Mat scores = outBlob.row(j).colRange(5, outBlob.cols);
       Point classIdPoint;
       double confidence;
-      minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
+      minMaxLoc(scores, nullptr, &confidence, nullptr, &classIdPoint);
       if (confidence > confidenceThreshold) {
-        int centerX = outBlob.row(j).at<float>(0) * img.cols;
-        int centerY = outBlob.row(j).at<float>(1) * img.rows;
-        int width   = outBlob.row(j).at<float>(2) * img.cols;
-        int height  = outBlob.row(j).at<float>(3) * img.rows;
-        int left    = centerX - width / 2;
-        int top     = centerY - height / 2;
+        auto centerX = outBlob.row(j).at<float>(0) * img.cols;
+        auto centerY = outBlob.row(j).at<float>(1) * img.rows;
+        auto width   = outBlob.row(j).at<float>(2) * img.cols;
+        auto height  = outBlob.row(j).at<float>(3) * img.rows;
+        auto left    = centerX - width / 2;
+        auto top     = centerY - height / 2;
 
         classIds.push_back(classIdPoint.x);
         confidences.push_back(confidence);
-        boxes.push_back(Rect(left, top, width, height));
+        rectangle(img, Rect(left, top, width, height), Scalar(0, 255, 0), 2);
       }
     }
   }
 
-  float nmsThreshold = 0.5;
-  vector<int> indices;
-  NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
-  for (int i = 0; i < indices.size(); i++) {
-    int idx  = indices[i];
-    Rect box = boxes[idx];
-    rectangle(img, box, Scalar(0, 255, 0), 2);
-  }
+  //  float nmsThreshold = 0.5;
+  //  vector<int> indices;
+  //  NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
+  //  for (int idx : indices) {
+  //    Rect box = boxes[idx];
+  //    rectangle(img, box, Scalar(0, 255, 0), 2);
+  //  }
 }
 
 int main() {
@@ -144,17 +147,20 @@ int main() {
     classes.push_back(line);
   }
 
-  Net model         = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
-
-  string file_yolo  = "models/yolo/classes_names_yolo.txt";
-  string cfg_file   = "models/yolo/yolov4-tiny.cfg";
-  string model_file = "models/yolo/yolov4-tiny.weights";
-
-  Net net           = readNet(model_file, cfg_file);
+  Net model = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
+  Net net   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
   for (const auto &img : imageMat) {
+    int padding = 50;
+    Mat padded_image(img.size().height + 2 * padding,
+                     img.size().width + 2 * padding, CV_8UC3,
+                     cv::Scalar(0, 0, 0));
 
-    blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
+    img.copyTo(padded_image(
+        cv::Rect(padding, padding, img.size().width, img.size().height)));
+
+    blobFromImage(padded_image, blob, 1., Size(224, 224), Scalar(104, 117, 123),
+                  true);
     model.setInput(blob);
     net.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
     Mat prob = model.forward();
@@ -172,12 +178,12 @@ int main() {
 
     string label = format("%s: %2.f", classes[classId].c_str(), confidence);
 
-    putText(img, label, Point(0, img.rows - 7), FONT_HERSHEY_SIMPLEX, 0.8,
-            CV_RGB(0, 255, 0), 2, LINE_AA);
+    putText(padded_image, label, Point(0, padded_image.rows - 7),
+            FONT_HERSHEY_SIMPLEX, 0.8, CV_RGB(0, 255, 0), 2, LINE_AA);
 
-    postProcessing(outs, net, img);
+    postProcessing(outs, model, padded_image);
 
-    imshow("image", img);
-    waitKey(0);
+    imshow("image", padded_image);
+    waitKey(1000);
   }
 }
