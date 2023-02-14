@@ -210,10 +210,9 @@ int main() {
   vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
   Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
 
-  namedWindow("nice_name", WINDOW_AUTOSIZE);
-  VideoCapture capture = readVideo(VIDEO_PATH);
-  Mat frame;
+  VideoCapture capture            = readVideo(VIDEO_PATH);
 
+  Mat frame;
   while (true) {
     capture >> frame;
 
