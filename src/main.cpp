@@ -20,6 +20,7 @@
 
 #define DATA_PATH "data/"
 #define IMAGE_PATH_DIR DATA_PATH "small-Voc2007/"
+#define VIDEO_PATH DATA_PATH "Video2.mp4"
 
 #define MODEL_PATH "models/"
 
@@ -36,6 +37,8 @@
 #define RED CV_RGB(255, 0, 0)
 #define GREEN CV_RGB(0, 255, 0)
 #define BLUE CV_RGB(0, 0, 255)
+
+#define MAX_CHOICES 5
 
 using namespace cv;
 using namespace std;
@@ -79,9 +82,9 @@ recursiveListFiles(const string &path) {
   return std::filesystem::recursive_directory_iterator(path);
 }
 
-bool isImagePath(const string &path) {
+bool isImagePath(const string &path, const string &ext) {
   // here we check if the given path is a valid image path
-  return !path.substr(path.length() - 4, 4).compare(".jpg");
+  return !path.substr(path.length() - 4, 4).compare(ext);
 }
 
 vector<string> getAllImageFiles(const string &path) {
@@ -89,10 +92,11 @@ vector<string> getAllImageFiles(const string &path) {
   vector<string> imagePath;
   for (const auto &path : recursiveListFiles(path)) {
     string pathToInspect = path.path().string();
-    if (isImagePath(pathToInspect)) {
+    if (isImagePath(pathToInspect, ".jpg")) {
       imagePath.push_back(pathToInspect);
     }
   }
+  cout << "Found " << imagePath.size() << " image files" << endl;
   return imagePath;
 }
 
@@ -202,19 +206,112 @@ void drawPredictions(const Mat &img, Net &model, vector<string> &classNames,
           std::move(color), 2, LINE_AA);
 }
 
-int main() {
-  vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
+void computeReadAndPredictRandomImages(const string &path, Net &yoloModel,
+                                       Net &googleModel,
+                                       vector<string> &googleClassNames) {
+  for (const auto &img : readImageVector(getAllImageFiles(path))) {
+    auto start = high_resolution_clock::now();
 
+    drawRoi(img, yoloModel, GREEN);
+    drawPredictions(img, googleModel, googleClassNames, GREEN);
+    imshow("image", img);
+
+    cout << "total execution time :" << computeDuration(start) << " ms" << endl;
+    waitKey(1000);
+  }
+}
+
+unsigned int askChoice() {
+  cout << "what do you want to do?"
+       << "\n\t-1 predict random images"
+       << "\n\t-2 make predictions from folder path which contains images"
+       << "\n\t-3 make predictions from camera"
+       << "\n\t-4 make predictions from random video"
+       << "\n\t-5 make predictions from video path"
+       << "\n enter the choice number:";
+
+  unsigned int choice;
+  cin >> choice;
+
+  cout << "you choose " << choice << endl;
+  return choice;
+}
+
+bool isChoiceOk(unsigned int &choice) {
+  return choice > 0 && choice <= MAX_CHOICES;
+}
+
+unsigned int computeAskingRealChoice() {
+  unsigned int choice;
+  while (!isChoiceOk(choice)) {
+    choice = askChoice();
+    if (isChoiceOk(choice)) {
+      break;
+    } else {
+      cerr << "Invalid choice" << endl;
+    }
+  }
+  return choice;
+}
+
+void computeVideoCapture(VideoCapture &capture, Net yoloModel, Net googleModel,
+                         vector<string> googleClassNames) {
+  Mat frame;
+  while (true) {
+    auto start = high_resolution_clock ::now();
+    capture >> frame;
+
+    resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
+
+    drawRoi(frame, yoloModel, GREEN);
+    drawPredictions(frame, googleModel, googleClassNames, GREEN);
+
+    imshow("video", frame);
+
+    cout << "total execution time :" << computeDuration(start) << " ms" << endl;
+
+    if (waitKey(1) == 27)
+      break;
+  }
+}
+
+void manageChoices(Net &yoloModel, Net &googleModel,
+                   vector<string> &googleClassNames, unsigned int &choice) {
+  VideoCapture capture;
+  string path;
+  switch (choice) {
+  case 1:
+    computeReadAndPredictRandomImages(IMAGE_PATH_DIR, yoloModel, googleModel,
+                                      googleClassNames);
+  case 2:
+    cout << "give the folder image path : ";
+    cin >> path;
+    computeReadAndPredictRandomImages(path, yoloModel, googleModel,
+                                      googleClassNames);
+  case 3:
+    capture.open(0);
+    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+  case 4:
+    capture = readVideo(VIDEO_PATH);
+    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+  case 5:
+    cout << "give the video path : ";
+    cin >> path;
+    capture = readVideo(path);
+    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+  default:
+    cerr << "invalid choice" << endl;
+  }
+}
+
+int main() {
   vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
   Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
   vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
   Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
 
-  for (const auto &img : imageMat) {
-    drawRoi(img, yoloModel, GREEN);
-    drawPredictions(img, googleModel, googleClassNames, GREEN);
-    imshow("image", img);
-    waitKey(1000);
-  }
+  unsigned int choice             = computeAskingRealChoice();
+
+  manageChoices(yoloModel, googleModel, googleClassNames, choice);
 }
