@@ -202,8 +202,18 @@ void drawPredictions(const Mat &img, Net &model, vector<string> &classNames,
           std::move(color), 2, LINE_AA);
 }
 
+void computeReadAndPredictRandomImages(const string &path, Net &yoloModel,
+                                       Net &googleModel,
+                                       vector<string> &googleClassNames) {
+  for (const auto &img : readImageVector(getAllImageFiles(path))) {
+    drawRoi(img, yoloModel, GREEN);
+    drawPredictions(img, googleModel, googleClassNames, GREEN);
+    imshow("image", img);
+    waitKey(1000);
+  }
+}
+
 int main() {
-  vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
 
   vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
   Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
@@ -211,10 +221,6 @@ int main() {
   vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
   Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
 
-  for (const auto &img : imageMat) {
-    drawRoi(img, yoloModel, GREEN);
-    drawPredictions(img, googleModel, googleClassNames, GREEN);
-    imshow("image", img);
-    waitKey(1000);
-  }
+  computeReadAndPredictRandomImages(IMAGE_PATH_DIR, yoloModel, googleModel,
+                                    googleClassNames);
 }
