@@ -38,6 +38,8 @@
 #define GREEN CV_RGB(0, 255, 0)
 #define BLUE CV_RGB(0, 0, 255)
 
+#define MAX_CHOICES 5
+
 using namespace cv;
 using namespace std;
 using namespace dnn;
@@ -215,18 +217,36 @@ void computeReadAndPredictRandomImages(const string &path, Net &yoloModel,
   }
 }
 
-int askChoice() {
+unsigned int askChoice() {
   cout << "what do you want to do?"
        << "\n\t-1 predict random images"
        << "\n\t-2 make predictions from folder path which contains images"
        << "\n\t-3 make predictions from camera"
-       << "\n\t-4 make predictions from video path"
+       << "\n\t-4 make predictions from random video"
+       << "\n\t-5 make predictions from video path"
        << "\n enter the choice number:";
 
-  int choice;
+  unsigned int choice;
   cin >> choice;
 
   cout << "you choose " << choice << endl;
+  return choice;
+}
+
+bool isChoiceOk(unsigned int &choice) {
+  return choice > 0 && choice <= MAX_CHOICES;
+}
+
+unsigned int computeAskingRealChoice() {
+  unsigned int choice;
+  while (!isChoiceOk(choice)) {
+    choice = askChoice();
+    if (isChoiceOk(choice)) {
+      break;
+    } else {
+      cerr << "Invalid choice" << endl;
+    }
+  }
   return choice;
 }
 
@@ -256,7 +276,7 @@ void manageChoices(Net &yoloModel, Net &googleModel,
     computeReadAndPredictRandomImages(IMAGE_PATH_DIR, yoloModel, googleModel,
                                       googleClassNames);
   case 2:
-    cout << "give the folder image path :";
+    cout << "give the folder image path : ";
     cin >> path;
     computeReadAndPredictRandomImages(path, yoloModel, googleModel,
                                       googleClassNames);
@@ -266,12 +286,15 @@ void manageChoices(Net &yoloModel, Net &googleModel,
   case 4:
     capture = readVideo(VIDEO_PATH);
     computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+  case 5:
+    cout << "give the video path : ";
+    cin >> path;
+    capture = readVideo(path);
+    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
   default:
     cerr << "invalid choice" << endl;
   }
 }
-
-bool isChoiceOk(unsigned int &choice) { return choice > 0 && choice < 5; }
 
 int main() {
   vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
@@ -280,15 +303,7 @@ int main() {
   vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
   Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
 
-  unsigned int choice;
-  while (!isChoiceOk(choice)) {
-    choice = askChoice();
-    if (isChoiceOk(choice)) {
-      break;
-    } else {
-      cerr << "Invalid choice" << endl;
-    }
-  }
+  unsigned int choice             = computeAskingRealChoice();
 
   manageChoices(yoloModel, googleModel, googleClassNames, choice);
 }
