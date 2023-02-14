@@ -247,6 +247,30 @@ void computeVideoCapture(VideoCapture &capture, Net yoloModel, Net googleModel,
   }
 }
 
+void manageChoices(Net &yoloModel, Net &googleModel,
+                   vector<string> &googleClassNames, int &choice) {
+  VideoCapture capture;
+  string path;
+  switch (choice) {
+  case 1:
+    computeReadAndPredictRandomImages(IMAGE_PATH_DIR, yoloModel, googleModel,
+                                      googleClassNames);
+  case 2:
+    cout << "give the folder image path :";
+    cin >> path;
+    computeReadAndPredictRandomImages(path, yoloModel, googleModel,
+                                      googleClassNames);
+  case 3:
+    capture.open(0);
+    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+  case 4:
+    capture = readVideo(VIDEO_PATH);
+    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+  default:
+    cerr << "invalid choice: " << choice << endl;
+  }
+}
+
 int main() {
   vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
   Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
@@ -258,22 +282,6 @@ int main() {
   if (choice > 4 || choice < 1) {
     cerr << "invalid choice: " << choice << endl;
   }
-  VideoCapture camera(0);
-  VideoCapture capture = readVideo(VIDEO_PATH);
-  switch (choice) {
-  case 1:
-    computeReadAndPredictRandomImages(IMAGE_PATH_DIR, yoloModel, googleModel,
-                                      googleClassNames);
-    break;
-    //  case 2:
-    //    cout << "give the folder image path :";
-    //    string path;
-    //    cin >> path;
-    //    computeReadAndPredictRandomImages(path, yoloModel, googleModel,
-    //                                      googleClassNames);
-  case 3:
-    computeVideoCapture(camera, yoloModel, googleModel, googleClassNames);
-  case 4:
-    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
-  }
+
+  manageChoices(yoloModel, googleModel, googleClassNames, choice);
 }
