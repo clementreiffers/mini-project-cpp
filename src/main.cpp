@@ -230,6 +230,23 @@ int askChoice() {
   return choice;
 }
 
+void computeVideoCapture(VideoCapture &capture, Net yoloModel, Net googleModel,
+                         vector<string> googleClassNames) {
+  Mat frame;
+  while (true) {
+    capture >> frame;
+
+    resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
+
+    drawRoi(frame, yoloModel, GREEN);
+    drawPredictions(frame, googleModel, googleClassNames, GREEN);
+
+    imshow("video", frame);
+    if (waitKey(1) == 27)
+      break;
+  }
+}
+
 int main() {
   vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
   Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
@@ -241,30 +258,22 @@ int main() {
   if (choice > 4 || choice < 1) {
     cerr << "invalid choice: " << choice << endl;
   }
+  VideoCapture camera(0);
+  VideoCapture capture = readVideo(VIDEO_PATH);
   switch (choice) {
   case 1:
     computeReadAndPredictRandomImages(IMAGE_PATH_DIR, yoloModel, googleModel,
                                       googleClassNames);
-  case 2:
-    cout << "give the folder image path :";
-    string path;
-    cin >> path;
-    computeReadAndPredictRandomImages(path, yoloModel, googleModel,
-                                      googleClassNames);
+    break;
+    //  case 2:
+    //    cout << "give the folder image path :";
+    //    string path;
+    //    cin >> path;
+    //    computeReadAndPredictRandomImages(path, yoloModel, googleModel,
+    //                                      googleClassNames);
+  case 3:
+    computeVideoCapture(camera, yoloModel, googleModel, googleClassNames);
   case 4:
-    VideoCapture capture            = readVideo(VIDEO_PATH);
-
-    Mat frame;
-    while (true) {
-      capture >> frame;
-
-      resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
-
-      drawRoi(frame, yoloModel, GREEN);
-      drawPredictions(frame, googleModel, googleClassNames, GREEN);
-
-      imshow("video", frame);
-      if (waitKey(1) == 27)
-        break;
-       }
+    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+  }
 }
