@@ -248,7 +248,7 @@ void computeVideoCapture(VideoCapture &capture, Net yoloModel, Net googleModel,
 }
 
 void manageChoices(Net &yoloModel, Net &googleModel,
-                   vector<string> &googleClassNames, int &choice) {
+                   vector<string> &googleClassNames, unsigned int &choice) {
   VideoCapture capture;
   string path;
   switch (choice) {
@@ -267,9 +267,11 @@ void manageChoices(Net &yoloModel, Net &googleModel,
     capture = readVideo(VIDEO_PATH);
     computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
   default:
-    cerr << "invalid choice: " << choice << endl;
+    cerr << "invalid choice" << endl;
   }
 }
+
+bool isChoiceOk(unsigned int &choice) { return choice > 0 && choice < 5; }
 
 int main() {
   vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
@@ -278,9 +280,14 @@ int main() {
   vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
   Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
 
-  int choice                      = askChoice();
-  if (choice > 4 || choice < 1) {
-    cerr << "invalid choice: " << choice << endl;
+  unsigned int choice;
+  while (!isChoiceOk(choice)) {
+    choice = askChoice();
+    if (isChoiceOk(choice)) {
+      break;
+    } else {
+      cerr << "Invalid choice" << endl;
+    }
   }
 
   manageChoices(yoloModel, googleModel, googleClassNames, choice);
