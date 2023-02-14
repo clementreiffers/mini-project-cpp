@@ -6,6 +6,7 @@
 #include "opencv2/imgproc.hpp"
 #include "opencv2/opencv.hpp"
 #include "opencv2/videoio.hpp"
+#include <opencv2/opencv.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -24,6 +25,10 @@
 #define GOOGLE_CFG_FILE MODEL_PATH "google/bvlc_googlenet.caffemodel"
 #define GOOGLE_MODEL_FILE MODEL_PATH "google/bvlc_googlenet.prototxt"
 #define GOOGLE_CLASS_NAMES MODEL_PATH "google/classes_names_googlenet.txt"
+
+#define YOLO_MODEL_FILE MODEL_PATH "yolo/yolov4-tiny.weights"
+#define YOLO_CFG_FILE MODEL_PATH "yolo/yolov4-tiny.cfg"
+#define YOLO_CLASS_NAMES MODEL_PATH "yolo/classes_names_yolo.txt"
 
 using namespace cv;
 using namespace std;
@@ -96,49 +101,100 @@ long long computeDuration(time_point<steady_clock> &start) {
   return duration_cast<microseconds>(getNow() - start).count() / 1000;
 }
 
+void postProcessing(const vector<Mat> &outs, const Net &net, Mat img) {
+  float confidenceThreshold = 0.33;
+
+  vector<int> classIds;
+  vector<float> confidences;
+  vector<Rect> boxes;
+
+  for (auto &out : outs) {
+    Mat outBlob = Mat(out.size(), out.depth(), out.data);
+
+    for (int j = 0; j < outBlob.rows; j++) {
+      Mat scores = outBlob.row(j).colRange(5, outBlob.cols);
+      Point classIdPoint;
+      double confidence;
+      minMaxLoc(scores, nullptr, &confidence, nullptr, &classIdPoint);
+      if (confidence > confidenceThreshold) {
+        auto centerX = outBlob.row(j).at<float>(0) * img.cols;
+        auto centerY = outBlob.row(j).at<float>(1) * img.rows;
+        auto width   = outBlob.row(j).at<float>(2) * img.cols;
+        auto height  = outBlob.row(j).at<float>(3) * img.rows;
+        auto left    = centerX - width / 2;
+        auto top     = centerY - height / 2;
+
+        classIds.push_back(classIdPoint.x);
+        confidences.push_back(confidence);
+        rectangle(img, Rect(left, top, width, height), Scalar(0, 255, 0), 2);
+      }
+    }
+  }
+}
+
 int main() {
 
   vector<Mat> imageMat =
       randomizeVectorMat(readImageVector(getAllImageFiles(IMAGE_PATH_DIR)));
   Mat blob;
 
-  ifstream ifs(GOOGLE_CLASS_NAMES);
-  if (!ifs.is_open()) {
-    cerr << GOOGLE_CLASS_NAMES << " not found!" << endl;
-  }
+  for (const auto &image : imageMat) {
+    imshow("image", image);
+    blobFromImage(image, blob, 1., Size(416, 416), Scalar(), true);
+    ifstream ifs(GOOGLE_CLASS_NAMES);
+    if (!ifs.is_open()) {
+      cerr << GOOGLE_CLASS_NAMES << " not found!" << endl;
+    }
 
-  vector<string> classes;
-  string line;
-  while (getline(ifs, line)) {
-    classes.push_back(line);
-  }
+    vector<string> classes;
+    string line;
+    while (getline(ifs, line)) {
+      classes.push_back(line);
+    }
 
-  Net model = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
+    Net modelGoogle = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
+    Net modelYolo   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
-  for (const auto &img : imageMat) {
-    auto start = high_resolution_clock::now();
+    for (const auto &img : imageMat) {
+      auto start  = high_resolution_clock::now();
+      int padding = 50;
+      Mat padded_image(img.size().height + 2 * padding,
+                       img.size().width + 2 * padding, CV_8UC3,
+                       cv::Scalar(0, 0, 0));
 
-    blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
-    model.setInput(blob);
+      img.copyTo(padded_image(
+          cv::Rect(padding, padding, img.size().width, img.size().height)));
 
-    Point classIdPoint;
-    double confidence;
-    minMaxLoc(model.forward(), nullptr, &confidence, nullptr, &classIdPoint);
-    int classId = classIdPoint.x;
+      blobFromImage(padded_image, blob, 1., Size(224, 224),
+                    Scalar(104, 117, 123), true);
+      modelGoogle.setInput(blob);
+      modelYolo.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
+      Mat probGoogle = modelGoogle.forward();
 
-    vector<Mat> outs;
-    model.forward(outs, model.getUnconnectedOutLayersNames());
+      Point classIdPoint;
+      double confidence;
+      minMaxLoc(probGoogle, nullptr, &confidence, nullptr, &classIdPoint);
+      int classId                 = classIdPoint.x;
 
-    string label = format("%s: %2.f", classes[classId].c_str(), confidence);
+      vector<string> outNames     = modelGoogle.getUnconnectedOutLayersNames();
+      vector<string> outNamesYolo = modelYolo.getUnconnectedOutLayersNames();
+      vector<Mat> outsGoogle, outsYolo;
+      modelGoogle.forward(outsGoogle, outNames);
+      modelYolo.forward(outsYolo, outNamesYolo);
 
-    putText(img, label, Point(0, img.rows - 7), FONT_HERSHEY_SIMPLEX, 0.8,
-            CV_RGB(0, 255, 0), 2, LINE_AA);
+      string label = format("%s: %2.f", classes[classId].c_str(), confidence);
 
-    imshow("image", img);
+      long long countMiliseconds = computeDuration(start);
 
-    long long countMiliseconds = computeDuration(start);
+      cout << "execution time in miliseconds : " << countMiliseconds << endl;
+      waitKey(1000);
+      postProcessing(outsYolo, modelYolo, padded_image);
 
-    cout << "execution time in miliseconds : " << countMiliseconds << endl;
-    waitKey(1000);
+      putText(padded_image, label, Point(0, padded_image.rows - 7),
+              FONT_HERSHEY_SIMPLEX, 0.8, CV_RGB(0, 255, 0), 2, LINE_AA);
+
+      imshow("image", padded_image);
+      waitKey(1000);
+    }
   }
 }
