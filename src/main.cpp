@@ -210,9 +210,13 @@ void computeReadAndPredictRandomImages(const string &path, Net &yoloModel,
                                        Net &googleModel,
                                        vector<string> &googleClassNames) {
   for (const auto &img : readImageVector(getAllImageFiles(path))) {
+    auto start = high_resolution_clock::now();
+
     drawRoi(img, yoloModel, GREEN);
     drawPredictions(img, googleModel, googleClassNames, GREEN);
     imshow("image", img);
+
+    cout << "total execution time :" << computeDuration(start) << " ms" << endl;
     waitKey(1000);
   }
 }
@@ -254,6 +258,7 @@ void computeVideoCapture(VideoCapture &capture, Net yoloModel, Net googleModel,
                          vector<string> googleClassNames) {
   Mat frame;
   while (true) {
+    auto start = high_resolution_clock ::now();
     capture >> frame;
 
     resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
@@ -262,6 +267,9 @@ void computeVideoCapture(VideoCapture &capture, Net yoloModel, Net googleModel,
     drawPredictions(frame, googleModel, googleClassNames, GREEN);
 
     imshow("video", frame);
+
+    cout << "total execution time :" << computeDuration(start) << " ms" << endl;
+
     if (waitKey(1) == 27)
       break;
   }
