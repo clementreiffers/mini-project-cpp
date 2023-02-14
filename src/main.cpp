@@ -92,7 +92,7 @@ vector<Mat> randomizeVectorMat(vector<Mat> vec) {
   return vec;
 }
 
-void postProcessing(vector<Mat> outs, Net net, Mat img) {
+void postProcessing(const vector<Mat> &outs, const Net &net, Mat img) {
   float confidenceThreshold = 0.33;
 
   vector<int> classIds;
@@ -121,14 +121,6 @@ void postProcessing(vector<Mat> outs, Net net, Mat img) {
       }
     }
   }
-
-  //  float nmsThreshold = 0.5;
-  //  vector<int> indices;
-  //  NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
-  //  for (int idx : indices) {
-  //    Rect box = boxes[idx];
-  //    rectangle(img, box, Scalar(0, 255, 0), 2);
-  //  }
 }
 
 int main() {
@@ -178,10 +170,10 @@ int main() {
 
     string label = format("%s: %2.f", classes[classId].c_str(), confidence);
 
+    postProcessing(outs, model, padded_image);
+
     putText(padded_image, label, Point(0, padded_image.rows - 7),
             FONT_HERSHEY_SIMPLEX, 0.8, CV_RGB(0, 255, 0), 2, LINE_AA);
-
-    postProcessing(outs, model, padded_image);
 
     imshow("image", padded_image);
     waitKey(1000);
