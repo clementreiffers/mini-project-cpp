@@ -189,14 +189,40 @@ void drawRoi(const Mat &img, Net &model, Scalar color) {
   postProcessing(outs, model, img, std::move(color));
 }
 
-int main() {
-  vector<Mat> imageMat   = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
+void drawPredictions(const Mat &img, Net &model, vector<string> &classNames,
+                     Scalar color) {
+  Mat blob;
+  blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
+  model.setInput(blob);
+  Mat prob = model.forward();
 
-  vector<string> classes = readClassNames(YOLO_CLASS_NAMES);
-  Net net                = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
+  Point classIdPoint;
+  double confidence;
+  minMaxLoc(prob, nullptr, &confidence, nullptr, &classIdPoint);
+  int classId             = classIdPoint.x;
+
+  vector<string> outNames = model.getUnconnectedOutLayersNames();
+  vector<Mat> outs;
+  model.forward(outs, outNames);
+
+  string label = format("%s: %2.f", classNames[classId].c_str(), confidence);
+
+  putText(img, label, Point(0, img.rows - 7), FONT_HERSHEY_SIMPLEX, 0.8,
+          std::move(color), 2, LINE_AA);
+}
+
+int main() {
+  vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
+
+  vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
+  Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
+
+  vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
+  Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
 
   for (const auto &img : imageMat) {
-    drawRoi(img, net, RED);
+    drawRoi(img, yoloModel, GREEN);
+    drawPredictions(img, googleModel, googleClassNames, GREEN);
     imshow("image", img);
     waitKey(1000);
   }
