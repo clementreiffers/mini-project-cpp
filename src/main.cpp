@@ -15,6 +15,7 @@
 #include <iostream>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 #define DATA_PATH "data/"
@@ -107,35 +108,44 @@ long long computeDuration(time_point<steady_clock> &start) {
   return duration_cast<microseconds>(getNow() - start).count() / 1000;
 }
 
-void postProcessing(const vector<Mat> &outs, const Net &net, Mat img,
-                    Scalar color) {
+void postProcessing(vector<Mat> outs, Net net, Mat img, Scalar color) {
   float confidenceThreshold = 0.33;
 
   vector<int> classIds;
   vector<float> confidences;
   vector<Rect> boxes;
 
-  for (auto &out : outs) {
-    Mat outBlob = Mat(out.size(), out.depth(), out.data);
+  for (int i = 0; i < outs.size(); i++) {
+    Mat outBlob = Mat(outs[i].size(), outs[i].depth(), outs[i].data);
 
     for (int j = 0; j < outBlob.rows; j++) {
       Mat scores = outBlob.row(j).colRange(5, outBlob.cols);
       Point classIdPoint;
       double confidence;
-      minMaxLoc(scores, nullptr, &confidence, nullptr, &classIdPoint);
+      minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
       if (confidence > confidenceThreshold) {
-        auto centerX = outBlob.row(j).at<float>(0) * img.cols;
-        auto centerY = outBlob.row(j).at<float>(1) * img.rows;
-        auto width   = outBlob.row(j).at<float>(2) * img.cols;
-        auto height  = outBlob.row(j).at<float>(3) * img.rows;
-        auto left    = centerX - width / 2;
-        auto top     = centerY - height / 2;
+        int centerX = outBlob.row(j).at<float>(0) * img.cols;
+        int centerY = outBlob.row(j).at<float>(1) * img.rows;
+        int width   = outBlob.row(j).at<float>(2) * img.cols;
+        int height  = outBlob.row(j).at<float>(3) * img.rows;
+        int left    = centerX - width / 2;
+        int top     = centerY - height / 2;
 
         classIds.push_back(classIdPoint.x);
         confidences.push_back(confidence);
-        rectangle(img, Rect(left, top, width, height), color, 2);
+        boxes.push_back(Rect(left, top, width, height));
       }
     }
+  }
+
+  float nmsThreshold = 0.5;
+  vector<int> indices;
+  NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
+  for (int i = 0; i < indices.size(); i++) {
+    int idx  = indices[i];
+    Rect box = boxes[idx];
+    rectangle(img, box, color, 2);
+    // draw prediction
   }
 }
 
@@ -166,68 +176,27 @@ string setStringFormat(const string &className, double confidence) {
   return format("%s %.2f", className.c_str(), confidence);
 }
 
+void drawRoi(const Mat &img, Net &model, Scalar color) {
+  Mat blob;
+
+  blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
+  model.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
+
+  vector<String> outNames = model.getUnconnectedOutLayersNames();
+  vector<Mat> outs;
+
+  model.forward(outs, outNames);
+  postProcessing(outs, model, img, std::move(color));
+}
+
 int main() {
-  vector<Mat> imageMat =
-      randomizeVectorMat(readImageVector(getAllImageFiles(IMAGE_PATH_DIR)));
+  vector<Mat> imageMat   = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
 
-  vector<string> googleClassName = readClassNames(GOOGLE_CLASS_NAMES);
-  vector<string> yoloClassName   = readClassNames(YOLO_CLASS_NAMES);
+  vector<string> classes = readClassNames(YOLO_CLASS_NAMES);
+  Net net                = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
-  Net modelGoogle                = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
-  Net modelYolo                  = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
-
-  for (auto &img : imageMat) {
-    auto start = high_resolution_clock::now();
-
-    Mat blob;
-    blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
-
-    //    img        = setPadding(img);
-
-    blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
-
-    modelGoogle.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
-    modelYolo.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
-
-    Mat probGoogle = modelGoogle.forward();
-    Mat probYolo   = modelYolo.forward();
-
-    Point classIdPointGoogle, classIdPointYolo;
-
-    double googleConfidence, yoloConfidence;
-
-    minMaxLoc(probGoogle, nullptr, &googleConfidence, nullptr,
-              &classIdPointGoogle);
-    int classIdGoogle = classIdPointGoogle.x;
-
-    minMaxLoc(probYolo, nullptr, &yoloConfidence, nullptr, &classIdPointYolo);
-    int classIdYolo               = classIdPointYolo.x;
-
-    vector<string> outNamesGoogle = modelGoogle.getUnconnectedOutLayersNames();
-    vector<string> outNamesYolo   = modelYolo.getUnconnectedOutLayersNames();
-    vector<Mat> outsGoogle, outsYolo;
-
-    modelGoogle.forward(outsGoogle, outNamesGoogle);
-    modelYolo.forward(outsYolo, outNamesYolo);
-
-    string googleLabel =
-        setStringFormat(googleClassName[classIdGoogle], googleConfidence);
-    string yoloLabel =
-        setStringFormat(yoloClassName[classIdYolo], yoloConfidence);
-
-    long long countMiliseconds = computeDuration(start);
-
-    postProcessing(outsYolo, modelYolo, img, RED);
-    postProcessing(outsGoogle, modelGoogle, img, GREEN);
-
-    putText(img, googleLabel, Point(0, img.rows - 7), FONT_HERSHEY_SIMPLEX, 0.8,
-            GREEN, 1, LINE_AA);
-
-    putText(img, yoloLabel, Point(0, img.rows - 60), FONT_HERSHEY_SIMPLEX, 0.8,
-            RED, 1, LINE_AA);
-
-    cout << "execution time in miliseconds : " << countMiliseconds << endl;
-
+  for (const auto &img : imageMat) {
+    drawRoi(img, net, RED);
     imshow("image", img);
     waitKey(1000);
   }
