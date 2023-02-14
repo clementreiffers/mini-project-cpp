@@ -9,6 +9,7 @@
 #include <opencv2/opencv.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -32,6 +33,7 @@
 using namespace cv;
 using namespace std;
 using namespace dnn;
+using namespace std::chrono;
 
 Mat readImage(const string &path) {
   // here we give the matrix of the image given by its path
@@ -93,6 +95,12 @@ vector<Mat> randomizeVectorMat(vector<Mat> vec) {
   return vec;
 }
 
+time_point<steady_clock> getNow() { return high_resolution_clock::now(); }
+
+long long computeDuration(time_point<steady_clock> &start) {
+  return duration_cast<microseconds>(getNow() - start).count() / 1000;
+}
+
 void postProcessing(const vector<Mat> &outs, const Net &net, Mat img) {
   float confidenceThreshold = 0.33;
 
@@ -125,6 +133,7 @@ void postProcessing(const vector<Mat> &outs, const Net &net, Mat img) {
 }
 
 int main() {
+
   vector<Mat> imageMat =
       randomizeVectorMat(readImageVector(getAllImageFiles(IMAGE_PATH_DIR)));
   Mat blob;
@@ -147,6 +156,7 @@ int main() {
     Net modelYolo   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
     for (const auto &img : imageMat) {
+      auto start  = high_resolution_clock::now();
       int padding = 50;
       Mat padded_image(img.size().height + 2 * padding,
                        img.size().width + 2 * padding, CV_8UC3,
@@ -174,6 +184,10 @@ int main() {
 
       string label = format("%s: %2.f", classes[classId].c_str(), confidence);
 
+      long long countMiliseconds = computeDuration(start);
+
+      cout << "execution time in miliseconds : " << countMiliseconds << endl;
+      waitKey(1000);
       postProcessing(outsYolo, modelYolo, padded_image);
 
       putText(padded_image, label, Point(0, padded_image.rows - 7),
