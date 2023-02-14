@@ -202,19 +202,81 @@ void drawPredictions(const Mat &img, Net &model, vector<string> &classNames,
           std::move(color), 2, LINE_AA);
 }
 
+void postProcessing(vector<Mat> outs, Net net, Mat frame) {
+  double confidenceThreshold = 0.35;
+
+  vector<int> classIds;
+  vector<float> confidences;
+  vector<Rect> boxes;
+
+  for (int i = 0; i < outs.size(); i++) {
+    Mat outBlob = Mat(outs[i].size(), outs[i].depth(), outs[i].data);
+
+    for (int j = 0; j < outBlob.rows; j++) {
+      Mat scores = outBlob.row(j).colRange(5, outBlob.cols);
+      Point classIdPoint;
+      double confidence;
+      minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
+      if (confidence > confidenceThreshold) {
+        int centerX = outBlob.row(j).at<float>(0) * frame.cols;
+        int centerY = outBlob.row(j).at<float>(1) * frame.rows;
+        int width   = outBlob.row(j).at<float>(2) * frame.cols;
+        int height  = outBlob.row(j).at<float>(3) * frame.rows;
+        int left    = centerX - width / 2;
+        int top     = centerY - height / 2;
+
+        classIds.push_back(classIdPoint.x);
+        confidences.push_back(confidence);
+        boxes.push_back(Rect(left, top, width, height));
+      }
+    }
+  }
+
+  float nmsThreshold = 0.5;
+  vector<int> indices;
+  NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
+  for (int i = 0; i < indices.size(); i++) {
+    int idx  = indices[i];
+    Rect box = boxes[idx];
+    rectangle(frame, box, Scalar(0, 255, 0), 2);
+  }
+}
+
 int main() {
-  vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
+  //  vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
+  //
+  //  vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
+  //  Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
+  //
+  //  vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
+  //  Net googleModel                 = readNet(GOOGLE_MODEL_FILE,
+  //  GOOGLE_CFG_FILE);
+  //
+  //  for (const auto &img : imageMat) {
+  //    drawRoi(frame, yoloModel, GREEN);
+  //    drawPredictions(frame, googleModel, googleClassNames, GREEN);
+  //    imshow("image", frame);
+  //    waitKey(1000);
+  //  }
+  VideoCapture capture;
+  Mat frame;
+  capture.open("data/Video2.mp4");
+  vector<string> yoloClassNames = readClassNames(YOLO_CLASS_NAMES);
+  Net yoloModel                 = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
-  vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
-  Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
+  namedWindow("nice_name", WINDOW_AUTOSIZE);
+  capture.open("data/Video2.mp4");
 
-  vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
-  Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
+  Mat blob;
 
-  for (const auto &img : imageMat) {
-    drawRoi(img, yoloModel, GREEN);
-    drawPredictions(img, googleModel, googleClassNames, GREEN);
-    imshow("image", img);
-    waitKey(1000);
+  while (true) {
+    char key = waitKey(1);
+    capture >> frame;
+    drawRoi(frame, yoloModel, GREEN);
+    drawPredictions(frame, yoloModel, yoloClassNames, GREEN);
+
+    imshow("nice_name", frame);
+    if (key == 27)
+      break;
   }
 }
