@@ -79,9 +79,9 @@ recursiveListFiles(const string &path) {
   return std::filesystem::recursive_directory_iterator(path);
 }
 
-bool isImagePath(const string &path) {
+bool isImagePath(const string &path, const string &ext) {
   // here we check if the given path is a valid image path
-  return !path.substr(path.length() - 4, 4).compare(".jpg");
+  return !path.substr(path.length() - 4, 4).compare(ext);
 }
 
 vector<string> getAllImageFiles(const string &path) {
@@ -89,10 +89,11 @@ vector<string> getAllImageFiles(const string &path) {
   vector<string> imagePath;
   for (const auto &path : recursiveListFiles(path)) {
     string pathToInspect = path.path().string();
-    if (isImagePath(pathToInspect)) {
+    if (isImagePath(pathToInspect, ".jpg")) {
       imagePath.push_back(pathToInspect);
     }
   }
+  cout << "Found " << imagePath.size() << " image files" << endl;
   return imagePath;
 }
 
@@ -213,6 +214,21 @@ void computeReadAndPredictRandomImages(const string &path, Net &yoloModel,
   }
 }
 
+int askChoice() {
+  cout << "what do you want to do?"
+       << "\n\t-1 predict random images"
+       << "\n\t-2 make predictions from folder path which contains images"
+       << "\n\t-3 make predictions from camera"
+       << "\n\t-4 make predictions from video path"
+       << "\n enter the choice number:";
+
+  int choice;
+  cin >> choice;
+
+  cout << "you choose " << choice << endl;
+  return choice;
+}
+
 int main() {
 
   vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
@@ -221,6 +237,19 @@ int main() {
   vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
   Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
 
-  computeReadAndPredictRandomImages(IMAGE_PATH_DIR, yoloModel, googleModel,
-                                    googleClassNames);
+  int choice                      = askChoice();
+  if (choice > 4 || choice < 1) {
+    cerr << "invalid choice: " << choice << endl;
+  }
+  switch (choice) {
+  case 1:
+    computeReadAndPredictRandomImages(IMAGE_PATH_DIR, yoloModel, googleModel,
+                                      googleClassNames);
+  case 2:
+    cout << "give the folder image path :";
+    string path;
+    cin >> path;
+    computeReadAndPredictRandomImages(path, yoloModel, googleModel,
+                                      googleClassNames);
+  }
 }
