@@ -15,6 +15,7 @@
 #include <iostream>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 #define DATA_PATH "data/"
@@ -29,6 +30,12 @@
 #define YOLO_MODEL_FILE MODEL_PATH "yolo/yolov4-tiny.weights"
 #define YOLO_CFG_FILE MODEL_PATH "yolo/yolov4-tiny.cfg"
 #define YOLO_CLASS_NAMES MODEL_PATH "yolo/classes_names_yolo.txt"
+
+#define IMAGE_PADDING 20
+
+#define RED CV_RGB(255, 0, 0)
+#define GREEN CV_RGB(0, 255, 0)
+#define BLUE CV_RGB(0, 0, 255)
 
 using namespace cv;
 using namespace std;
@@ -101,7 +108,7 @@ long long computeDuration(time_point<steady_clock> &start) {
   return duration_cast<microseconds>(getNow() - start).count() / 1000;
 }
 
-void postProcessing(const vector<Mat> &outs, const Net &net, Mat img) {
+void postProcessing(const vector<Mat> &outs, Mat img, const Scalar &color) {
   float confidenceThreshold = 0.33;
 
   vector<int> classIds;
@@ -115,86 +122,99 @@ void postProcessing(const vector<Mat> &outs, const Net &net, Mat img) {
       Mat scores = outBlob.row(j).colRange(5, outBlob.cols);
       Point classIdPoint;
       double confidence;
-      minMaxLoc(scores, nullptr, &confidence, nullptr, &classIdPoint);
+      minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
       if (confidence > confidenceThreshold) {
-        auto centerX = outBlob.row(j).at<float>(0) * img.cols;
-        auto centerY = outBlob.row(j).at<float>(1) * img.rows;
-        auto width   = outBlob.row(j).at<float>(2) * img.cols;
-        auto height  = outBlob.row(j).at<float>(3) * img.rows;
-        auto left    = centerX - width / 2;
-        auto top     = centerY - height / 2;
+        int centerX = outBlob.row(j).at<float>(0) * img.cols;
+        int centerY = outBlob.row(j).at<float>(1) * img.rows;
+        int width   = outBlob.row(j).at<float>(2) * img.cols;
+        int height  = outBlob.row(j).at<float>(3) * img.rows;
+        int left    = centerX - width / 2;
+        int top     = centerY - height / 2;
 
         classIds.push_back(classIdPoint.x);
         confidences.push_back(confidence);
-        rectangle(img, Rect(left, top, width, height), Scalar(0, 255, 0), 2);
+        //        boxes.push_back(Rect(left, top, width, height));
+        rectangle(img, Rect(left, top, width, height), color, 2);
       }
     }
   }
 }
 
-int main() {
+vector<string> readClassNames(const string &fileName) {
+  vector<string> classNames;
+  std::ifstream file(fileName);
+  if (file.is_open()) {
+    std::string className;
+    while (getline(file, className)) {
+      classNames.push_back(className);
+    }
+  }
+  return classNames;
+}
 
-  vector<Mat> imageMat =
-      randomizeVectorMat(readImageVector(getAllImageFiles(IMAGE_PATH_DIR)));
+Mat setPadding(const Mat &img) {
+  int padding = 50;
+  Mat padded_image(img.size().height + 2 * padding,
+                   img.size().width + 2 * padding, CV_8UC3,
+                   cv::Scalar(0, 0, 0));
+
+  img.copyTo(padded_image(
+      cv::Rect(padding, padding, img.size().width, img.size().height)));
+  return padded_image;
+}
+
+string setStringFormat(const string &className, double confidence) {
+  return format("%s %.2f", className.c_str(), confidence);
+}
+
+void drawRoi(const Mat &img, Net &model, const Scalar &color) {
   Mat blob;
 
-  for (const auto &image : imageMat) {
-    imshow("image", image);
-    blobFromImage(image, blob, 1., Size(416, 416), Scalar(), true);
-    ifstream ifs(GOOGLE_CLASS_NAMES);
-    if (!ifs.is_open()) {
-      cerr << GOOGLE_CLASS_NAMES << " not found!" << endl;
-    }
+  blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
+  model.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
 
-    vector<string> classes;
-    string line;
-    while (getline(ifs, line)) {
-      classes.push_back(line);
-    }
+  vector<String> outNames = model.getUnconnectedOutLayersNames();
+  vector<Mat> outs;
 
-    Net modelGoogle = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
-    Net modelYolo   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
+  model.forward(outs, outNames);
+  postProcessing(outs, img, color);
+}
 
-    for (const auto &img : imageMat) {
-      auto start  = high_resolution_clock::now();
-      int padding = 50;
-      Mat padded_image(img.size().height + 2 * padding,
-                       img.size().width + 2 * padding, CV_8UC3,
-                       cv::Scalar(0, 0, 0));
+void drawPredictions(const Mat &img, Net &model, vector<string> &classNames,
+                     Scalar color) {
+  Mat blob;
+  blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
+  model.setInput(blob);
+  Mat prob = model.forward();
 
-      img.copyTo(padded_image(
-          cv::Rect(padding, padding, img.size().width, img.size().height)));
+  Point classIdPoint;
+  double confidence;
+  minMaxLoc(prob, nullptr, &confidence, nullptr, &classIdPoint);
+  int classId             = classIdPoint.x;
 
-      blobFromImage(padded_image, blob, 1., Size(224, 224),
-                    Scalar(104, 117, 123), true);
-      modelGoogle.setInput(blob);
-      modelYolo.setInput(blob, "", 0.00392, Scalar(0, 0, 0));
-      Mat probGoogle = modelGoogle.forward();
+  vector<string> outNames = model.getUnconnectedOutLayersNames();
+  vector<Mat> outs;
+  model.forward(outs, outNames);
 
-      Point classIdPoint;
-      double confidence;
-      minMaxLoc(probGoogle, nullptr, &confidence, nullptr, &classIdPoint);
-      int classId                 = classIdPoint.x;
+  string label = format("%s: %2.f", classNames[classId].c_str(), confidence);
 
-      vector<string> outNames     = modelGoogle.getUnconnectedOutLayersNames();
-      vector<string> outNamesYolo = modelYolo.getUnconnectedOutLayersNames();
-      vector<Mat> outsGoogle, outsYolo;
-      modelGoogle.forward(outsGoogle, outNames);
-      modelYolo.forward(outsYolo, outNamesYolo);
+  putText(img, label, Point(0, img.rows - 7), FONT_HERSHEY_SIMPLEX, 0.8,
+          std::move(color), 2, LINE_AA);
+}
 
-      string label = format("%s: %2.f", classes[classId].c_str(), confidence);
+int main() {
+  vector<Mat> imageMat = readImageVector(getAllImageFiles(IMAGE_PATH_DIR));
 
-      long long countMiliseconds = computeDuration(start);
+  vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
+  Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
-      cout << "execution time in miliseconds : " << countMiliseconds << endl;
-      waitKey(1000);
-      postProcessing(outsYolo, modelYolo, padded_image);
+  vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
+  Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
 
-      putText(padded_image, label, Point(0, padded_image.rows - 7),
-              FONT_HERSHEY_SIMPLEX, 0.8, CV_RGB(0, 255, 0), 2, LINE_AA);
-
-      imshow("image", padded_image);
-      waitKey(1000);
-    }
+  for (const auto &img : imageMat) {
+    drawRoi(img, yoloModel, GREEN);
+    drawPredictions(img, googleModel, googleClassNames, GREEN);
+    imshow("image", img);
+    waitKey(1000);
   }
 }
