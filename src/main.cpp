@@ -108,15 +108,15 @@ long long computeDuration(time_point<steady_clock> &start) {
   return duration_cast<microseconds>(getNow() - start).count() / 1000;
 }
 
-void postProcessing(vector<Mat> outs, Net net, Mat img, Scalar color) {
+void postProcessing(const vector<Mat> &outs, Mat img, const Scalar &color) {
   float confidenceThreshold = 0.33;
 
   vector<int> classIds;
   vector<float> confidences;
   vector<Rect> boxes;
 
-  for (int i = 0; i < outs.size(); i++) {
-    Mat outBlob = Mat(outs[i].size(), outs[i].depth(), outs[i].data);
+  for (auto &out : outs) {
+    Mat outBlob = Mat(out.size(), out.depth(), out.data);
 
     for (int j = 0; j < outBlob.rows; j++) {
       Mat scores = outBlob.row(j).colRange(5, outBlob.cols);
@@ -133,19 +133,10 @@ void postProcessing(vector<Mat> outs, Net net, Mat img, Scalar color) {
 
         classIds.push_back(classIdPoint.x);
         confidences.push_back(confidence);
-        boxes.push_back(Rect(left, top, width, height));
+        //        boxes.push_back(Rect(left, top, width, height));
+        rectangle(img, Rect(left, top, width, height), color, 2);
       }
     }
-  }
-
-  float nmsThreshold = 0.5;
-  vector<int> indices;
-  NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
-  for (int i = 0; i < indices.size(); i++) {
-    int idx  = indices[i];
-    Rect box = boxes[idx];
-    rectangle(img, box, color, 2);
-    // draw prediction
   }
 }
 
@@ -161,7 +152,7 @@ vector<string> readClassNames(const string &fileName) {
   return classNames;
 }
 
-Mat setPadding(Mat img) {
+Mat setPadding(const Mat &img) {
   int padding = 50;
   Mat padded_image(img.size().height + 2 * padding,
                    img.size().width + 2 * padding, CV_8UC3,
@@ -176,7 +167,7 @@ string setStringFormat(const string &className, double confidence) {
   return format("%s %.2f", className.c_str(), confidence);
 }
 
-void drawRoi(const Mat &img, Net &model, Scalar color) {
+void drawRoi(const Mat &img, Net &model, const Scalar &color) {
   Mat blob;
 
   blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
@@ -186,7 +177,7 @@ void drawRoi(const Mat &img, Net &model, Scalar color) {
   vector<Mat> outs;
 
   model.forward(outs, outNames);
-  postProcessing(outs, model, img, std::move(color));
+  postProcessing(outs, img, color);
 }
 
 void drawPredictions(const Mat &img, Net &model, vector<string> &classNames,
