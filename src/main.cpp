@@ -16,7 +16,7 @@
 
 #define DATA_PATH "data/"
 #define IMAGE_PATH_DIR DATA_PATH "small-Voc2007/"
-#define VIDEO_PATH DATA_PATH "Video2.mp4"
+#define VIDEO_PATH DATA_PATH "Video1.mp4"
 
 #define MODEL_PATH "models/"
 
