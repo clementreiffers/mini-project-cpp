@@ -34,7 +34,7 @@
 #define GREEN CV_RGB(0, 255, 0)
 #define BLUE CV_RGB(0, 0, 255)
 
-#define MAX_CHOICES 5
+#define MAX_CHOICES 6
 
 #define IS_CAMERA true
 
@@ -245,6 +245,7 @@ unsigned int askChoice() {
        << "\n\t-3 make predictions from camera"
        << "\n\t-4 make predictions from random video"
        << "\n\t-5 make predictions from video path"
+       << "\n\t-6 Stop the code"
        << "\n enter the choice number:";
 
   unsigned int choice;
@@ -324,6 +325,9 @@ void manageChoices(Net &model, vector<string> &classNames,
     cin >> path;
     capture = readVideo(path);
     computeVideoCapture(capture, model, classNames);
+  case 6:
+    cout << "Stopping the process...";
+    break;
   default:
     cerr << "invalid choice" << endl;
   }
