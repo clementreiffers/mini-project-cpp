@@ -193,6 +193,12 @@ void drawRoi(const Mat &img, Net &model, const vector<string> &classNames,
   postProcessing(outs, img, classNames, color);
 }
 
+void imshowFullScreen(const Mat &img) {
+  namedWindow("image", WND_PROP_FULLSCREEN);
+  setWindowProperty("image", WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
+  imshow("image", img);
+}
+
 void computeReadAndPredictRandomImages(const string &path, Net &model,
                                        vector<string> &classNames) {
   for (const auto &img :
@@ -200,8 +206,8 @@ void computeReadAndPredictRandomImages(const string &path, Net &model,
     auto start = high_resolution_clock::now();
 
     drawRoi(img, model, classNames, GREEN);
-    //    drawPredictions(img, googleModel, classNames, GREEN);
-    imshow("image", img);
+
+    imshowFullScreen(img);
 
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
     waitKey(1000);
@@ -252,7 +258,7 @@ void computeVideoCapture(VideoCapture &capture, Net model,
 
     drawRoi(frame, model, classNames, GREEN);
 
-    imshow("video", frame);
+    imshowFullScreen(frame);
 
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
 
