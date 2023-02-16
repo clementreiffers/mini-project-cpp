@@ -38,6 +38,13 @@
 
 #define IS_CAMERA true
 
+#define SLOW_DOWN 'a'
+#define SPEED_UP 'A'
+#define QUIT 'q'
+#define PAUSE 32
+
+using namespace std;
+
 using namespace cv;
 using namespace std;
 using namespace dnn;
@@ -122,17 +129,6 @@ vector<string> readClassNames(const string &fileName) {
   return classNames;
 }
 
-Mat setPadding(const Mat &img) {
-  int padding = 50;
-  Mat padded_image(img.size().height + 2 * padding,
-                   img.size().width + 2 * padding, CV_8UC3,
-                   cv::Scalar(0, 0, 0));
-
-  img.copyTo(padded_image(
-      cv::Rect(padding, padding, img.size().width, img.size().height)));
-  return padded_image;
-}
-
 string setStringFormat(const string &className, double confidence) {
   return format("%s %.2f", className.c_str(), confidence);
 }
@@ -195,18 +191,50 @@ void drawRoi(const Mat &img, Net &model, const vector<string> &classNames,
   postProcessing(outs, img, classNames, color);
 }
 
+void manageKeys(int &key, int &speed, const Mat &img) {
+  if (key == QUIT || key == 'Q' || key == 27) {
+    cout << "Exiting.." << endl;
+    exit(0);
+  }
+  if (key == SPEED_UP) {
+    if (speed > 100) {
+      speed -= 100;
+    }
+    putText(img, "speed : " + to_string(speed), Point(15, 15),
+            FONT_HERSHEY_SIMPLEX, 0.8, RED, 2, LINE_AA);
+  }
+  if (key == SLOW_DOWN) {
+    speed += 100;
+    putText(img, "speed : " + to_string(speed), Point(15, 15),
+            FONT_HERSHEY_SIMPLEX, 0.8, BLUE, 2, LINE_AA);
+  }
+  if (key == PAUSE) {
+    if (speed > 0) {
+      speed = 0;
+      putText(img, "PAUSE ||", Point(15, 15), FONT_HERSHEY_SIMPLEX, 0.8, BLUE,
+              2, LINE_AA);
+    } else if (speed == 0) {
+      speed = 1000;
+      putText(img, "LECTURE |>", Point(15, 15), FONT_HERSHEY_SIMPLEX, 0.8, RED,
+              2, LINE_AA);
+    }
+  }
+}
+
 void computeReadAndPredictRandomImages(const string &path, Net &model,
                                        vector<string> &classNames) {
+  int speed = 1000;
   for (const auto &img :
        randomizeVectorMat(readImageVector(getAllImageFiles(path)))) {
     auto start = high_resolution_clock::now();
 
     drawRoi(img, model, classNames, GREEN);
 
-    imshow("image", img);
-
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
-    waitKey(1000);
+    int key = waitKey(speed);
+    manageKeys(key, speed, img);
+
+    imshow("image", img);
   }
 }
 
@@ -243,10 +271,11 @@ unsigned int computeAskingRealChoice() {
   return choice;
 }
 
-void computeVideoCapture(VideoCapture &capture, Net model,
-                         const vector<string> &classNames,
-                         bool isCamera = false) {
+[[noreturn]] void computeVideoCapture(VideoCapture &capture, Net model,
+                                      const vector<string> &classNames,
+                                      bool isCamera = false) {
   Mat frame;
+  int speed = 1;
   while (true) {
     auto start = high_resolution_clock ::now();
     capture >> frame;
@@ -268,9 +297,8 @@ void computeVideoCapture(VideoCapture &capture, Net model,
     imshow("image", frame);
 
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
-
-    if (waitKey(1) == 27)
-      break;
+    int key = waitKey(speed);
+    manageKeys(key, speed, frame);
   }
 }
 
