@@ -112,7 +112,35 @@ long long computeDuration(time_point<steady_clock> &start) {
   return duration_cast<microseconds>(getNow() - start).count() / 1000;
 }
 
-void postProcessing(const vector<Mat> &outs, Mat img, const Scalar &color) {
+vector<string> readClassNames(const string &fileName) {
+  vector<string> classNames;
+  std::ifstream file(fileName);
+  if (file.is_open()) {
+    std::string className;
+    while (getline(file, className)) {
+      classNames.push_back(className);
+    }
+  }
+  return classNames;
+}
+
+Mat setPadding(const Mat &img) {
+  int padding = 50;
+  Mat padded_image(img.size().height + 2 * padding,
+                   img.size().width + 2 * padding, CV_8UC3,
+                   cv::Scalar(0, 0, 0));
+
+  img.copyTo(padded_image(
+      cv::Rect(padding, padding, img.size().width, img.size().height)));
+  return padded_image;
+}
+
+string setStringFormat(const string &className, double confidence) {
+  return format("%s %.2f", className.c_str(), confidence);
+}
+
+void postProcessing(const vector<Mat> &outs, Mat img,
+                    const vector<string> &classNames, const Scalar &color) {
   float confidenceThreshold = 0.33;
 
   vector<int> classIds;
@@ -147,37 +175,16 @@ void postProcessing(const vector<Mat> &outs, Mat img, const Scalar &color) {
   for (int idx : indices) {
     Rect box = boxes[idx];
     rectangle(img, box, GREEN, 2);
+
+    string label =
+        format("%s: %2.f", classNames[classIds[idx]].c_str(), confidences[idx]);
+    putText(img, label, Point(box.x, box.y), FONT_HERSHEY_SIMPLEX, 0.8, color,
+            2, LINE_AA);
   }
 }
 
-vector<string> readClassNames(const string &fileName) {
-  vector<string> classNames;
-  std::ifstream file(fileName);
-  if (file.is_open()) {
-    std::string className;
-    while (getline(file, className)) {
-      classNames.push_back(className);
-    }
-  }
-  return classNames;
-}
-
-Mat setPadding(const Mat &img) {
-  int padding = 50;
-  Mat padded_image(img.size().height + 2 * padding,
-                   img.size().width + 2 * padding, CV_8UC3,
-                   cv::Scalar(0, 0, 0));
-
-  img.copyTo(padded_image(
-      cv::Rect(padding, padding, img.size().width, img.size().height)));
-  return padded_image;
-}
-
-string setStringFormat(const string &className, double confidence) {
-  return format("%s %.2f", className.c_str(), confidence);
-}
-
-void drawRoi(const Mat &img, Net &model, const Scalar &color) {
+void drawRoi(const Mat &img, Net &model, const vector<string> &classNames,
+             const Scalar &color) {
   Mat blob;
 
   blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
@@ -187,39 +194,16 @@ void drawRoi(const Mat &img, Net &model, const Scalar &color) {
   vector<Mat> outs;
 
   model.forward(outs, outNames);
-  postProcessing(outs, img, color);
+  postProcessing(outs, img, classNames, color);
 }
 
-void drawPredictions(const Mat &img, Net &model, vector<string> &classNames,
-                     Scalar color) {
-  Mat blob;
-  blobFromImage(img, blob, 1., Size(224, 224), Scalar(104, 117, 123), true);
-  model.setInput(blob);
-  Mat prob = model.forward();
-
-  Point classIdPoint;
-  double confidence;
-  minMaxLoc(prob, nullptr, &confidence, nullptr, &classIdPoint);
-  int classId             = classIdPoint.x;
-
-  vector<string> outNames = model.getUnconnectedOutLayersNames();
-  vector<Mat> outs;
-  model.forward(outs, outNames);
-
-  string label = format("%s: %2.f", classNames[classId].c_str(), confidence);
-
-  putText(img, label, Point(0, img.rows - 7), FONT_HERSHEY_SIMPLEX, 0.8,
-          std::move(color), 2, LINE_AA);
-}
-
-void computeReadAndPredictRandomImages(const string &path, Net &yoloModel,
-                                       Net &googleModel,
-                                       vector<string> &googleClassNames) {
+void computeReadAndPredictRandomImages(const string &path, Net &model,
+                                       vector<string> &classNames) {
   for (const auto &img : readImageVector(getAllImageFiles(path))) {
     auto start = high_resolution_clock::now();
 
-    drawRoi(img, yoloModel, GREEN);
-    drawPredictions(img, googleModel, googleClassNames, GREEN);
+    drawRoi(img, model, classNames, GREEN);
+    //    drawPredictions(img, googleModel, classNames, GREEN);
     imshow("image", img);
 
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
@@ -260,8 +244,8 @@ unsigned int computeAskingRealChoice() {
   return choice;
 }
 
-void computeVideoCapture(VideoCapture &capture, Net yoloModel, Net googleModel,
-                         vector<string> googleClassNames) {
+void computeVideoCapture(VideoCapture &capture, Net model,
+                         vector<string> classNames) {
   Mat frame;
   while (true) {
     auto start = high_resolution_clock ::now();
@@ -269,8 +253,7 @@ void computeVideoCapture(VideoCapture &capture, Net yoloModel, Net googleModel,
 
     resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
 
-    drawRoi(frame, yoloModel, GREEN);
-    drawPredictions(frame, googleModel, googleClassNames, GREEN);
+    drawRoi(frame, model, classNames, GREEN);
 
     imshow("video", frame);
 
@@ -281,30 +264,28 @@ void computeVideoCapture(VideoCapture &capture, Net yoloModel, Net googleModel,
   }
 }
 
-void manageChoices(Net &yoloModel, Net &googleModel,
-                   vector<string> &googleClassNames, unsigned int &choice) {
+void manageChoices(Net &model, vector<string> &classNames,
+                   unsigned int &choice) {
   VideoCapture capture;
   string path;
   switch (choice) {
   case 1:
-    computeReadAndPredictRandomImages(IMAGE_PATH_DIR, yoloModel, googleModel,
-                                      googleClassNames);
+    computeReadAndPredictRandomImages(IMAGE_PATH_DIR, model, classNames);
   case 2:
     cout << "give the folder image path : ";
     cin >> path;
-    computeReadAndPredictRandomImages(path, yoloModel, googleModel,
-                                      googleClassNames);
+    computeReadAndPredictRandomImages(path, model, classNames);
   case 3:
     capture.open(0);
-    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+    computeVideoCapture(capture, model, classNames);
   case 4:
     capture = readVideo(VIDEO_PATH);
-    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+    computeVideoCapture(capture, model, classNames);
   case 5:
     cout << "give the video path : ";
     cin >> path;
     capture = readVideo(path);
-    computeVideoCapture(capture, yoloModel, googleModel, googleClassNames);
+    computeVideoCapture(capture, model, classNames);
   default:
     cerr << "invalid choice" << endl;
   }
@@ -319,5 +300,5 @@ int main() {
 
   unsigned int choice             = computeAskingRealChoice();
 
-  manageChoices(yoloModel, googleModel, googleClassNames, choice);
+  manageChoices(yoloModel, yoloClassNames, choice);
 }
