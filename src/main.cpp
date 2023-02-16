@@ -137,10 +137,16 @@ void postProcessing(const vector<Mat> &outs, Mat img, const Scalar &color) {
 
         classIds.push_back(classIdPoint.x);
         confidences.push_back(confidence);
-        //        boxes.push_back(Rect(left, top, width, height));
-        rectangle(img, Rect(left, top, width, height), color, 2);
+        boxes.emplace_back(left, top, width, height);
       }
     }
+  }
+  float nmsThreshold = 0.5;
+  vector<int> indices;
+  NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
+  for (int idx : indices) {
+    Rect box = boxes[idx];
+    rectangle(img, box, GREEN, 2);
   }
 }
 
