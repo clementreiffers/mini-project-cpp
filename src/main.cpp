@@ -195,7 +195,8 @@ void drawRoi(const Mat &img, Net &model, const vector<string> &classNames,
 
 void computeReadAndPredictRandomImages(const string &path, Net &model,
                                        vector<string> &classNames) {
-  for (const auto &img : readImageVector(getAllImageFiles(path))) {
+  for (const auto &img :
+       randomizeVectorMat(readImageVector(getAllImageFiles(path)))) {
     auto start = high_resolution_clock::now();
 
     drawRoi(img, model, classNames, GREEN);
