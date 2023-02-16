@@ -272,9 +272,9 @@ unsigned int computeAskingRealChoice() {
   return choice;
 }
 
-[[noreturn]] void computeVideoCapture(VideoCapture &capture, Net model,
-                                      const vector<string> &classNames,
-                                      bool isCamera = false) {
+void computeVideoCapture(VideoCapture &capture, Net model,
+                         const vector<string> &classNames,
+                         bool isCamera = false) {
   Mat frame;
   int speed = 1;
   while (true) {
@@ -295,11 +295,11 @@ unsigned int computeAskingRealChoice() {
       namedWindow("image", WND_PROP_FULLSCREEN);
       setWindowProperty("image", WND_PROP_FULLSCREEN, WINDOW_NORMAL);
     }
-    imshow("image", frame);
 
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
     int key = waitKey(speed);
     manageKeys(key, speed, frame);
+    imshow("image", frame);
   }
 }
 
