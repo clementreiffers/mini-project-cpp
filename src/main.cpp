@@ -36,6 +36,8 @@
 
 #define MAX_CHOICES 5
 
+#define IS_CAMERA true
+
 using namespace cv;
 using namespace std;
 using namespace dnn;
@@ -193,12 +195,6 @@ void drawRoi(const Mat &img, Net &model, const vector<string> &classNames,
   postProcessing(outs, img, classNames, color);
 }
 
-void imshowFullScreen(const Mat &img) {
-  namedWindow("image", WND_PROP_FULLSCREEN);
-  setWindowProperty("image", WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
-  imshow("image", img);
-}
-
 void computeReadAndPredictRandomImages(const string &path, Net &model,
                                        vector<string> &classNames) {
   for (const auto &img :
@@ -207,7 +203,7 @@ void computeReadAndPredictRandomImages(const string &path, Net &model,
 
     drawRoi(img, model, classNames, GREEN);
 
-    imshowFullScreen(img);
+    imshow("image", img);
 
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
     waitKey(1000);
@@ -248,17 +244,28 @@ unsigned int computeAskingRealChoice() {
 }
 
 void computeVideoCapture(VideoCapture &capture, Net model,
-                         const vector<string> &classNames) {
+                         const vector<string> &classNames,
+                         bool isCamera = false) {
   Mat frame;
   while (true) {
     auto start = high_resolution_clock ::now();
     capture >> frame;
 
-    resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
-
+    if (isCamera) {
+      resize(frame, frame, Size(1920, 1080));
+    } else {
+      resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
+    }
     drawRoi(frame, model, classNames, GREEN);
 
-    imshowFullScreen(frame);
+    if (isCamera) {
+      namedWindow("image", WND_PROP_FULLSCREEN);
+      setWindowProperty("image", WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
+    } else {
+      namedWindow("image", WND_PROP_FULLSCREEN);
+      setWindowProperty("image", WND_PROP_FULLSCREEN, WINDOW_NORMAL);
+    }
+    imshow("image", frame);
 
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
 
@@ -280,7 +287,7 @@ void manageChoices(Net &model, vector<string> &classNames,
     computeReadAndPredictRandomImages(path, model, classNames);
   case 3:
     capture.open(0);
-    computeVideoCapture(capture, model, classNames);
+    computeVideoCapture(capture, model, classNames, IS_CAMERA);
   case 4:
     capture = readVideo(VIDEO_PATH);
     computeVideoCapture(capture, model, classNames);
