@@ -197,8 +197,10 @@ void manageKeys(int &key, int &speed, const Mat &img) {
     exit(0);
   }
   if (key == SPEED_UP) {
-    if (speed > 100) {
+    if (speed - 100 > 0) {
       speed -= 100;
+    } else {
+      speed = 1;
     }
     putText(img, "speed : " + to_string(speed), Point(15, 15),
             FONT_HERSHEY_SIMPLEX, 0.8, RED, 2, LINE_AA);
@@ -334,13 +336,10 @@ void manageChoices(Net &model, vector<string> &classNames,
 }
 
 int main() {
-  vector<string> yoloClassNames   = readClassNames(YOLO_CLASS_NAMES);
-  Net yoloModel                   = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
+  vector<string> yoloClassNames = readClassNames(YOLO_CLASS_NAMES);
+  Net yoloModel                 = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
-  vector<string> googleClassNames = readClassNames(GOOGLE_CLASS_NAMES);
-  Net googleModel                 = readNet(GOOGLE_MODEL_FILE, GOOGLE_CFG_FILE);
-
-  unsigned int choice             = computeAskingRealChoice();
+  unsigned int choice           = computeAskingRealChoice();
 
   manageChoices(yoloModel, yoloClassNames, choice);
 }
