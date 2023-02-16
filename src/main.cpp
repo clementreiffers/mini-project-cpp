@@ -1,12 +1,9 @@
-#include "opencv2/calib3d.hpp"
 #include "opencv2/core.hpp"
-#include "opencv2/features2d.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/opencv.hpp"
 #include "opencv2/videoio.hpp"
-#include <opencv2/opencv.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -15,7 +12,6 @@
 #include <iostream>
 #include <random>
 #include <string>
-#include <utility>
 #include <vector>
 
 #define DATA_PATH "data/"
@@ -245,7 +241,7 @@ unsigned int computeAskingRealChoice() {
 }
 
 void computeVideoCapture(VideoCapture &capture, Net model,
-                         vector<string> classNames) {
+                         const vector<string> &classNames) {
   Mat frame;
   while (true) {
     auto start = high_resolution_clock ::now();
