@@ -310,21 +310,26 @@ void manageChoices(Net &model, vector<string> &classNames,
   switch (choice) {
   case 1:
     computeReadAndPredictRandomImages(IMAGE_PATH_DIR, model, classNames);
+    break;
   case 2:
     cout << "give the folder image path : ";
     cin >> path;
     computeReadAndPredictRandomImages(path, model, classNames);
+    break;
   case 3:
     capture.open(0);
     computeVideoCapture(capture, model, classNames, IS_CAMERA);
+    break;
   case 4:
     capture = readVideo(VIDEO_PATH);
     computeVideoCapture(capture, model, classNames);
+    break;
   case 5:
     cout << "give the video path : ";
     cin >> path;
     capture = readVideo(path);
     computeVideoCapture(capture, model, classNames);
+    break;
   case 6:
     cout << "Stopping the process...";
     break;
