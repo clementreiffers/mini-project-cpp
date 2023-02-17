@@ -33,6 +33,11 @@
 #define RED CV_RGB(255, 0, 0)
 #define GREEN CV_RGB(0, 255, 0)
 #define BLUE CV_RGB(0, 0, 255)
+#define YELLOW CV_RGB(255, 255, 0)
+#define WHITE CV_RGB(255, 255, 255)
+#define PINK CV_RGB(255, 0, 255)
+#define ORANGE CV_RGB(255, 128, 0)
+#define VIOLET CV_RGB(255, 0, 255)
 
 #define MAX_CHOICES 6
 
@@ -134,12 +139,14 @@ string setStringFormat(const string &className, double confidence) {
 }
 
 void postProcessing(const vector<Mat> &outs, Mat img,
-                    const vector<string> &classNames, const Scalar &color) {
+                    const vector<string> &classNames,
+                    const vector<Scalar> &colors) {
   float confidenceThreshold = 0.33;
 
   vector<int> classIds;
   vector<float> confidences;
   vector<Rect> boxes;
+  int colorIndex = 0;
 
   for (auto &out : outs) {
     Mat outBlob = Mat(out.size(), out.depth(), out.data);
@@ -148,7 +155,7 @@ void postProcessing(const vector<Mat> &outs, Mat img,
       Mat scores = outBlob.row(j).colRange(5, outBlob.cols);
       Point classIdPoint;
       double confidence;
-      minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
+      minMaxLoc(scores, nullptr, &confidence, nullptr, &classIdPoint);
       if (confidence > confidenceThreshold) {
         int centerX = outBlob.row(j).at<float>(0) * img.cols;
         int centerY = outBlob.row(j).at<float>(1) * img.rows;
@@ -167,17 +174,19 @@ void postProcessing(const vector<Mat> &outs, Mat img,
   vector<int> indices;
   NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
   for (int idx : indices) {
-    Rect box = boxes[idx];
-    rectangle(img, box, GREEN, 2);
+    Rect box     = boxes[idx];
+    Scalar color = colors[colorIndex];
+    rectangle(img, box, color, 2);
 
     string label = setStringFormat(classNames[classIds[idx]], confidences[idx]);
     putText(img, label, Point(box.x, box.y), FONT_HERSHEY_SIMPLEX, 0.8, color,
             2, LINE_AA);
+    colorIndex++;
   }
 }
 
 void drawRoi(const Mat &img, Net &model, const vector<string> &classNames,
-             const Scalar &color) {
+             const vector<Scalar> colors) {
   Mat blob;
 
   blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
@@ -187,7 +196,7 @@ void drawRoi(const Mat &img, Net &model, const vector<string> &classNames,
   vector<Mat> outs;
 
   model.forward(outs, outNames);
-  postProcessing(outs, img, classNames, color);
+  postProcessing(outs, img, classNames, colors);
 }
 
 void manageKeys(int &key, int &speed, const Mat &img) {
@@ -223,13 +232,14 @@ void manageKeys(int &key, int &speed, const Mat &img) {
 }
 
 void computeReadAndPredictRandomImages(const string &path, Net &model,
-                                       vector<string> &classNames) {
+                                       const vector<string> &classNames,
+                                       const vector<Scalar> &colors) {
   int speed = 1000;
   for (const auto &img :
        randomizeVectorMat(readImageVector(getAllImageFiles(path)))) {
     auto start = high_resolution_clock::now();
 
-    drawRoi(img, model, classNames, GREEN);
+    drawRoi(img, model, classNames, colors);
 
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
     int key = waitKey(speed);
@@ -273,9 +283,10 @@ unsigned int computeAskingRealChoice() {
   return choice;
 }
 
-void computeVideoCapture(VideoCapture &capture, Net model,
-                         const vector<string> &classNames,
-                         bool isCamera = false) {
+[[noreturn]] void computeVideoCapture(VideoCapture &capture, Net model,
+                                      const vector<string> &classNames,
+                                      const vector<Scalar> &colors,
+                                      bool isCamera = false) {
   Mat frame;
   int speed = 1;
   while (true) {
@@ -287,7 +298,7 @@ void computeVideoCapture(VideoCapture &capture, Net model,
     } else {
       resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
     }
-    drawRoi(frame, model, classNames, GREEN);
+    drawRoi(frame, model, classNames, colors);
 
     if (isCamera) {
       namedWindow("image", WND_PROP_FULLSCREEN);
@@ -304,32 +315,33 @@ void computeVideoCapture(VideoCapture &capture, Net model,
   }
 }
 
-void manageChoices(Net &model, vector<string> &classNames,
-                   unsigned int &choice) {
+void manageChoices(Net &model, vector<string> &classNames, unsigned int &choice,
+                   const vector<Scalar> &colors) {
   VideoCapture capture;
   string path;
   switch (choice) {
   case 1:
-    computeReadAndPredictRandomImages(IMAGE_PATH_DIR, model, classNames);
+    computeReadAndPredictRandomImages(IMAGE_PATH_DIR, model, classNames,
+                                      colors);
     break;
   case 2:
     cout << "give the folder image path : ";
     cin >> path;
-    computeReadAndPredictRandomImages(path, model, classNames);
+    computeReadAndPredictRandomImages(path, model, classNames, colors);
     break;
   case 3:
     capture.open(0);
-    computeVideoCapture(capture, model, classNames, IS_CAMERA);
+    computeVideoCapture(capture, model, classNames, colors, IS_CAMERA);
     break;
   case 4:
     capture = readVideo(VIDEO_PATH);
-    computeVideoCapture(capture, model, classNames);
+    computeVideoCapture(capture, model, classNames, colors);
     break;
   case 5:
     cout << "give the video path : ";
     cin >> path;
     capture = readVideo(path);
-    computeVideoCapture(capture, model, classNames);
+    computeVideoCapture(capture, model, classNames, colors);
     break;
   case 6:
     cout << "Stopping the process...";
@@ -344,6 +356,7 @@ int main() {
   Net yoloModel                 = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
   unsigned int choice           = computeAskingRealChoice();
+  vector<Scalar> colors{RED, GREEN, BLUE, YELLOW, PINK, ORANGE, VIOLET, WHITE};
 
-  manageChoices(yoloModel, yoloClassNames, choice);
+  manageChoices(yoloModel, yoloClassNames, choice, colors);
 }
