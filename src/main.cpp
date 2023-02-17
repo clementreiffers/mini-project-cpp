@@ -20,15 +20,9 @@
 
 #define MODEL_PATH "models/"
 
-#define GOOGLE_CFG_FILE MODEL_PATH "google/bvlc_googlenet.caffemodel"
-#define GOOGLE_MODEL_FILE MODEL_PATH "google/bvlc_googlenet.prototxt"
-#define GOOGLE_CLASS_NAMES MODEL_PATH "google/classes_names_googlenet.txt"
-
 #define YOLO_MODEL_FILE MODEL_PATH "yolo/yolov4-tiny.weights"
 #define YOLO_CFG_FILE MODEL_PATH "yolo/yolov4-tiny.cfg"
 #define YOLO_CLASS_NAMES MODEL_PATH "yolo/classes_names_yolo.txt"
-
-#define IMAGE_PADDING 20
 
 #define RED CV_RGB(255, 0, 0)
 #define GREEN CV_RGB(0, 255, 0)
@@ -200,6 +194,8 @@ void drawRoi(const Mat &img, Net &model, const vector<string> &classNames,
 }
 
 void manageKeys(int &key, int &speed, const Mat &img) {
+  string text;
+  Scalar color;
   if (key == QUIT || key == 'Q' || key == 27) {
     cout << "Exiting.." << endl;
     exit(0);
@@ -210,25 +206,27 @@ void manageKeys(int &key, int &speed, const Mat &img) {
     } else {
       speed = 1;
     }
-    putText(img, "speed : " + to_string(speed), Point(15, 15),
-            FONT_HERSHEY_SIMPLEX, 0.8, RED, 2, LINE_AA);
+    text  = "Speed up: " + to_string(speed);
+    color = RED;
   }
   if (key == SLOW_DOWN) {
     speed += 100;
-    putText(img, "speed : " + to_string(speed), Point(15, 15),
-            FONT_HERSHEY_SIMPLEX, 0.8, BLUE, 2, LINE_AA);
+    text  = "Slow down: " + to_string(speed);
+    color = BLUE;
   }
   if (key == PAUSE) {
     if (speed > 0) {
       speed = 0;
-      putText(img, "PAUSE ||", Point(15, 15), FONT_HERSHEY_SIMPLEX, 0.8, BLUE,
-              2, LINE_AA);
+      text  = "PAUSE ||";
+      color = BLUE;
     } else if (speed == 0) {
       speed = 1000;
-      putText(img, "LECTURE |>", Point(15, 15), FONT_HERSHEY_SIMPLEX, 0.8, RED,
-              2, LINE_AA);
+      text  = "LECTURE |>";
+      color = RED;
     }
   }
+  putText(img, text, Point(30, 30), FONT_HERSHEY_SIMPLEX, 0.8, color, 2,
+          LINE_AA);
 }
 
 void computeReadAndPredictRandomImages(const string &path, Net &model,
