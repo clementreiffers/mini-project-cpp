@@ -172,7 +172,7 @@ void postProcessing(const vector<Mat> &outs, Mat img,
     const Scalar &color = colors[colorIndex];
     const string label =
         setStringFormat(classNames[classIds[idx]], confidences[idx]);
- 
+
     rectangle(img, box, color, 1);
     putText(img, label, Point(box.x, box.y), FONT_HERSHEY_SIMPLEX, 0.8, color,
             1, LINE_AA);
@@ -356,7 +356,8 @@ int main() {
   Net yoloModel                 = readNet(YOLO_MODEL_FILE, YOLO_CFG_FILE);
 
   unsigned int choice           = computeAskingRealChoice();
-  vector<Scalar> colors{RED, GREEN, BLUE, YELLOW, PINK, ORANGE, VIOLET, WHITE};
+  const vector<Scalar> colors{RED,  GREEN,  BLUE,   YELLOW,
+                              PINK, ORANGE, VIOLET, WHITE};
 
   manageChoices(yoloModel, yoloClassNames, choice, colors);
 }
