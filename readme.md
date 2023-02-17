@@ -1,14 +1,16 @@
 # mini-project-cpp
 
+![docs/img/cpp.svg](docs/img/cpp.svg)
+![docs/img/opencv.svg](docs/img/opencv.svg)
+
 the goal of this project is to show random images available in `data/small-Voc2007`, predict what is it and show where
 is the interest of the prediction.
-
 
 > **Warning**
 >
 > The compilation only works with Windows platform and with the Visual Studion compiler. (see our CMakeList.txt)
 
-## Install it
+## Run it
 
 create a directory named `dependencies` and
 extract [this release](https://github.com/opencv/opencv/releases/download/4.7.0/opencv-4.7.0-windows.exe) inside.
@@ -22,5 +24,6 @@ directory.
 
 you can now run perfectly the project
 
+## Example of output image
 
-
+![img.png](docs/img/img.png) 
