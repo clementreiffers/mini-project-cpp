@@ -290,23 +290,19 @@ unsigned int computeAskingRealChoice() {
   Mat frame;
   int speed = 1;
   while (true) {
-    auto start = high_resolution_clock ::now();
     capture >> frame;
+    auto start = high_resolution_clock ::now();
 
     if (isCamera) {
       resize(frame, frame, Size(1920, 1080));
-    } else {
-      resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
-    }
-    drawRoi(frame, model, classNames, colors);
-
-    if (isCamera) {
       namedWindow("image", WND_PROP_FULLSCREEN);
       setWindowProperty("image", WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
     } else {
+      resize(frame, frame, Size(frame.cols / 2, frame.rows / 2));
       namedWindow("image", WND_PROP_FULLSCREEN);
       setWindowProperty("image", WND_PROP_FULLSCREEN, WINDOW_NORMAL);
     }
+    drawRoi(frame, model, classNames, colors);
 
     cout << "total execution time :" << computeDuration(start) << " ms" << endl;
     int key = waitKey(speed);
