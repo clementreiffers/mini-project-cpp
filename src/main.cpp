@@ -130,7 +130,7 @@ vector<string> readClassNames(const string &fileName) {
 }
 
 string setStringFormat(const string &className, double confidence) {
-  return format("%s %.2f", className.c_str(), confidence);
+  return format("%s %.2f %%", className.c_str(), confidence * 100);
 }
 
 void postProcessing(const vector<Mat> &outs, Mat img,
@@ -170,8 +170,7 @@ void postProcessing(const vector<Mat> &outs, Mat img,
     Rect box = boxes[idx];
     rectangle(img, box, GREEN, 2);
 
-    string label =
-        format("%s: %2.f", classNames[classIds[idx]].c_str(), confidences[idx]);
+    string label = setStringFormat(classNames[classIds[idx]], confidences[idx]);
     putText(img, label, Point(box.x, box.y), FONT_HERSHEY_SIMPLEX, 0.8, color,
             2, LINE_AA);
   }
