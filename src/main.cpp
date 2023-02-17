@@ -168,19 +168,21 @@ void postProcessing(const vector<Mat> &outs, Mat img,
   vector<int> indices;
   NMSBoxes(boxes, confidences, confidenceThreshold, nmsThreshold, indices);
   for (int idx : indices) {
-    Rect box     = boxes[idx];
-    Scalar color = colors[colorIndex];
+    const Rect box      = boxes[idx];
+    const Scalar &color = colors[colorIndex];
+    const string label =
+        setStringFormat(classNames[classIds[idx]], confidences[idx]);
+ 
     rectangle(img, box, color, 1);
-
-    string label = setStringFormat(classNames[classIds[idx]], confidences[idx]);
     putText(img, label, Point(box.x, box.y), FONT_HERSHEY_SIMPLEX, 0.8, color,
             1, LINE_AA);
+
     colorIndex++;
   }
 }
 
 void drawRoi(const Mat &img, Net &model, const vector<string> &classNames,
-             const vector<Scalar> colors) {
+             const vector<Scalar> &colors) {
   Mat blob;
 
   blobFromImage(img, blob, 1., Size(416, 416), Scalar(), true);
