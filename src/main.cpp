@@ -170,11 +170,11 @@ void postProcessing(const vector<Mat> &outs, Mat img,
   for (int idx : indices) {
     Rect box     = boxes[idx];
     Scalar color = colors[colorIndex];
-    rectangle(img, box, color, 2);
+    rectangle(img, box, color, 1);
 
     string label = setStringFormat(classNames[classIds[idx]], confidences[idx]);
     putText(img, label, Point(box.x, box.y), FONT_HERSHEY_SIMPLEX, 0.8, color,
-            2, LINE_AA);
+            1, LINE_AA);
     colorIndex++;
   }
 }
